@@ -1,0 +1,10 @@
+# Rust
+server/target/
+
+# Node
+client/node_modules/
+client/dist/
+
+# OS / editor
+.DS_Store
+*.log
