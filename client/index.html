@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>rustcraft</title>
+    <style>
+      html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
+      #app { position: fixed; inset: 0; }
+      canvas { display: block; }
+      .overlay {
+        position: fixed; inset: 0; display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 12px;
+        color: #fff; font-family: ui-monospace, Menlo, monospace;
+        background: rgba(0, 0, 0, 0.55); cursor: pointer; z-index: 10;
+        text-align: center;
+      }
+      .overlay h1 { font-size: 42px; margin: 0; letter-spacing: 2px; }
+      .overlay p { margin: 0; opacity: 0.85; line-height: 1.6; }
+      .overlay .error { color: #ff6b6b; }
+      .hidden { display: none !important; }
+      #crosshair {
+        position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+        color: #fff; font-size: 22px; text-shadow: 0 0 3px #000;
+        pointer-events: none; z-index: 5; user-select: none;
+      }
+      #hotbar {
+        position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%);
+        display: flex; gap: 4px; z-index: 5; pointer-events: none;
+      }
+      #hotbar .slot {
+        width: 44px; height: 44px; box-sizing: border-box;
+        border: 2px solid rgba(255, 255, 255, 0.35); border-radius: 4px;
+        background: rgba(0, 0, 0, 0.45); display: flex;
+        align-items: center; justify-content: center;
+      }
+      #hotbar .slot.selected { border-color: #fff; background: rgba(0, 0, 0, 0.7); }
+      #hotbar canvas { width: 32px; height: 32px; image-rendering: pixelated; }
+      #debug {
+        position: fixed; left: 8px; top: 8px; color: #fff; z-index: 5;
+        font: 12px ui-monospace, Menlo, monospace; text-shadow: 0 0 3px #000;
+        pointer-events: none; white-space: pre;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="crosshair" class="hidden">+</div>
+    <div id="hotbar" class="hidden"></div>
+    <div id="debug" class="hidden"></div>
+    <div id="overlay" class="overlay">
+      <h1>RUSTCRAFT</h1>
+      <p id="overlay-msg">loading…</p>
+    </div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
