@@ -24,8 +24,8 @@ scene.fog = new THREE.Fog(SKY, 60, 140);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 400);
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x777788, 0.9));
-const sun = new THREE.DirectionalLight(0xffffff, 0.9);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x777788, 1.15));
+const sun = new THREE.DirectionalLight(0xffffff, 1.1);
 sun.position.set(0.6, 1, 0.4);
 scene.add(sun);
 
@@ -298,3 +298,6 @@ function frame() {
 }
 
 frame();
+
+// Debug handle for tooling and console poking.
+window.__rustcraft = { world, player, chunkMeshes, remotePlayers };
