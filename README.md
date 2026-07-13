@@ -48,6 +48,37 @@ Click to grab the mouse and play. To play over LAN, run `npm run dev -- --host`
 and have friends open `http://<your-ip>:5173` — the client connects to the
 WebSocket server on the same hostname.
 
+### Alternative server: Node.js
+
+`server-js/` is a line-for-line port of the Rust server speaking the identical
+wire protocol — the client connects to either without changes. It exists to
+compare the two runtimes:
+
+```sh
+cd server-js
+npm install
+npm start          # same ws://0.0.0.0:8765 (PORT=8766 npm start to override)
+```
+
+Same seed produces a world with identical shape and cost, but not
+block-for-block identical terrain (the permutation table behind the Perlin
+noise is shuffled by a different RNG).
+
+`bench/` contains a protocol-level load test that runs against both servers:
+
+```sh
+cd bench
+npm install
+node smoke.js ws://localhost:8765     # protocol conformance (10 checks)
+node loadtest.js ws://localhost:8765 --bots 60 --radius 8 --secs 15
+```
+
+Phase 1 has every bot burst-load its view distance from a fresh region of the
+map (measures world gen + encode throughput); phase 2 has all bots stream pos
+updates at 20 Hz while timing block-edit round trips (measures relay latency
+under load). Restart the server between runs so chunks aren't served from
+cache.
+
 ### Controls
 
 | Input | Action |
