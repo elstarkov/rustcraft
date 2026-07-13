@@ -5,6 +5,7 @@ server/target/
 client/node_modules/
 client/dist/
 server-js/node_modules/
+bench/node_modules/
 
 # OS / editor
 .DS_Store
