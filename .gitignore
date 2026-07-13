@@ -4,6 +4,7 @@ server/target/
 # Node
 client/node_modules/
 client/dist/
+server-js/node_modules/
 
 # OS / editor
 .DS_Store
