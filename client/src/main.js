@@ -179,7 +179,7 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
         remotePlayers.remove(m.id);
         break;
       case 'player_pos':
-        remotePlayers.updatePos(m.id, m.x, m.y, m.z, m.yaw);
+        remotePlayers.updatePos(m.id, m.x, m.y, m.z, m.yaw, m.pitch);
         break;
       case 'block_update':
         applyEdit(m.x, m.y, m.z, m.id);

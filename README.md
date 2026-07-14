@@ -114,6 +114,12 @@ artifact-free). Per-face shading is baked into vertex colors, opaque and
 transparent passes are separate meshes; chunks stream in nearest-first and are
 evicted when far away.
 
+**Players** — remote players are blocky avatars (head, body, arms, legs) with
+deterministic per-id skins: shirt and pants colors from a golden-angle hue
+walk, one of four skin tones, hair, and an 8×8 pixel face. The walk cycle is
+paced by how fast the avatar actually moves between network updates, the head
+follows the sender's pitch, and yaw turns the short way around the circle.
+
 **Physics** — the player is a 0.6×1.8 AABB integrated per axis against the
 voxel grid (gravity, jumping, swimming). Block targeting uses an
 Amanatides & Woo voxel raycast, so picking is exact rather than mesh-based.
@@ -124,5 +130,5 @@ Amanatides & Woo voxel raycast, so picking is exact rather than mesh-based.
 - [x] Chunk persistence to disk (world survives server restarts)
 - [x] Greedy meshing + meshing in a web worker
 - [x] Day/night cycle
-- [ ] Player avatars with skins, walk animation
+- [x] Player avatars with skins, walk animation
 - [ ] Rust → wasm meshing module shared between client and server
