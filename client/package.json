@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:wasm": "cargo build --release --target wasm32-unknown-unknown --manifest-path ../mesher-wasm/Cargo.toml && cp ../mesher-wasm/target/wasm32-unknown-unknown/release/mesher_wasm.wasm src/mesher.wasm",
     "preview": "vite preview"
   },
   "dependencies": {

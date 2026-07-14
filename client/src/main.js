@@ -85,7 +85,15 @@ class ChunkMeshes {
     this.dirty = new Set();
     this.inFlight = new Set();
     this.worker = new Worker(new URL('./mesh-worker.js', import.meta.url), { type: 'module' });
-    this.worker.onmessage = (e) => this.onResult(e.data);
+    this.backend = 'starting';
+    this.worker.onmessage = (e) => {
+      if (e.data.backend) {
+        this.backend = e.data.backend;
+        console.log(`mesher backend: ${e.data.backend}`);
+        return;
+      }
+      this.onResult(e.data);
+    };
   }
 
   markDirty(key) {

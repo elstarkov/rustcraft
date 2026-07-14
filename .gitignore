@@ -1,6 +1,7 @@
 # Rust
 server/target/
 server/world/
+mesher-wasm/target/
 
 # Node
 client/node_modules/

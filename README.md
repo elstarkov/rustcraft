@@ -8,6 +8,8 @@ A Minecraft-style multiplayer voxel game with a hybrid architecture:
 - **`client/`** — browser client written in **JavaScript** with **Three.js**.
   Renders chunks streamed from the server, handles first-person controls,
   physics, and block breaking/placing.
+- **`mesher-wasm/`** — the client's greedy mesher as a **Rust** crate compiled
+  to WebAssembly, with the JS port kept as a fallback.
 
 ```
 ┌────────────────┐   WebSocket    ┌──────────────────────┐
@@ -114,6 +116,13 @@ artifact-free). Per-face shading is baked into vertex colors, opaque and
 transparent passes are separate meshes; chunks stream in nearest-first and are
 evicted when far away.
 
+The mesher exists twice: `mesher-wasm/` is a Rust port compiled to a 22 KB
+wasm module (raw pointer ABI, no bindgen) that the worker prefers — ~5× faster
+than the JS mesher with byte-identical output — and `mesh-core.js` is the
+fallback if instantiation fails. The `.wasm` is checked in, so running the
+client needs no Rust toolchain; rebuild it with `npm run build:wasm` (needs
+`rustup target add wasm32-unknown-unknown`).
+
 **Players** — remote players are blocky avatars (head, body, arms, legs) with
 deterministic per-id skins: shirt and pants colors from a golden-angle hue
 walk, one of four skin tones, hair, and an 8×8 pixel face. The walk cycle is
@@ -131,4 +140,4 @@ Amanatides & Woo voxel raycast, so picking is exact rather than mesh-based.
 - [x] Greedy meshing + meshing in a web worker
 - [x] Day/night cycle
 - [x] Player avatars with skins, walk animation
-- [ ] Rust → wasm meshing module shared between client and server
+- [x] Rust → wasm meshing module (~5× the JS mesher, JS fallback kept)
