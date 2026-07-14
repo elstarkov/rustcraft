@@ -1,5 +1,4 @@
-// Protocol-level load test for a rustcraft server (Rust or Node — same wire
-// protocol, so the same test runs against both).
+// Protocol-level load test for the rustcraft server.
 //
 //   node loadtest.js ws://localhost:8765 [--bots 20] [--radius 8] [--secs 10]
 //
