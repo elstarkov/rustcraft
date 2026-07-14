@@ -1,5 +1,6 @@
 # Rust
 server/target/
+server/world/
 
 # Node
 client/node_modules/

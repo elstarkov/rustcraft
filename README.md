@@ -82,7 +82,10 @@ cache.
 Perlin noise; columns get grass/dirt/stone layering, sand near the waterline,
 water up to sea level, and deterministic tree placement (same seed → same
 world). Chunks generate lazily on first request and are cached with any player
-edits applied.
+edits applied. Edited chunks are written through to `server/world/` as raw
+16 KB files and loaded from disk before regeneration, so builds survive server
+restarts — untouched terrain keeps regenerating from the seed and costs no
+disk at all.
 
 **Protocol** — JSON text frames for control messages (`hello`, `chunk_req`,
 `set_block`, `pos` → `welcome`, `block_update`, `player_join/pos/leave`) and
@@ -101,7 +104,7 @@ Amanatides & Woo voxel raycast, so picking is exact rather than mesh-based.
 ## Roadmap
 
 - [ ] Caves and ores
-- [ ] Chunk persistence to disk (world survives server restarts)
+- [x] Chunk persistence to disk (world survives server restarts)
 - [ ] Greedy meshing + meshing in a web worker
 - [ ] Day/night cycle
 - [ ] Player avatars with skins, walk animation

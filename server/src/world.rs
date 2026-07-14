@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
 
 use noise::{NoiseFn, Perlin};
 
@@ -55,14 +57,41 @@ pub struct World {
     seed: u32,
     noise: Perlin,
     chunks: HashMap<(i32, i32), Chunk>,
+    save_dir: PathBuf,
 }
 
 impl World {
-    pub fn new(seed: u32) -> Self {
+    pub fn new(seed: u32, save_dir: PathBuf) -> Self {
+        fs::create_dir_all(&save_dir).expect("failed to create world save dir");
         World {
             seed,
             noise: Perlin::new(seed),
             chunks: HashMap::new(),
+            save_dir,
+        }
+    }
+
+    pub fn saved_chunk_count(&self) -> usize {
+        fs::read_dir(&self.save_dir).map(|d| d.count()).unwrap_or(0)
+    }
+
+    fn chunk_path(&self, cx: i32, cz: i32) -> PathBuf {
+        self.save_dir.join(format!("c{cx}_{cz}.bin"))
+    }
+
+    /// Edited chunks are stored as raw block arrays, one file per chunk.
+    /// Untouched chunks have no file and keep regenerating from the seed.
+    fn load(&self, cx: i32, cz: i32) -> Option<Chunk> {
+        let blocks = fs::read(self.chunk_path(cx, cz)).ok()?;
+        (blocks.len() == CHUNK_VOLUME).then_some(Chunk { blocks })
+    }
+
+    fn persist(&self, cx: i32, cz: i32) {
+        let Some(chunk) = self.chunks.get(&(cx, cz)) else {
+            return;
+        };
+        if let Err(e) = fs::write(self.chunk_path(cx, cz), &chunk.blocks) {
+            eprintln!("failed to save chunk ({cx},{cz}): {e}");
         }
     }
 
@@ -179,7 +208,7 @@ impl World {
 
     pub fn chunk(&mut self, cx: i32, cz: i32) -> &Chunk {
         if !self.chunks.contains_key(&(cx, cz)) {
-            let c = self.generate(cx, cz);
+            let c = self.load(cx, cz).unwrap_or_else(|| self.generate(cx, cz));
             self.chunks.insert((cx, cz), c);
         }
         &self.chunks[&(cx, cz)]
@@ -201,6 +230,7 @@ impl World {
             z.rem_euclid(CHUNK_SIZE as i32) as usize,
             id,
         );
+        self.persist(cx, cz);
         true
     }
 

@@ -48,14 +48,17 @@ impl Server {
 #[tokio::main]
 async fn main() {
     let addr = "0.0.0.0:8765";
+    let world = World::new(1337, "world".into());
+    let saved = world.saved_chunk_count();
     let server = Arc::new(Server {
-        world: Mutex::new(World::new(1337)),
+        world: Mutex::new(world),
         clients: Mutex::new(HashMap::new()),
         next_id: AtomicU32::new(1),
     });
 
     let listener = TcpListener::bind(addr).await.expect("failed to bind");
     println!("rustcraft server listening on ws://{addr}");
+    println!("world edits persist to ./world ({saved} chunks saved so far)");
 
     while let Ok((stream, peer)) = listener.accept().await {
         let server = server.clone();
