@@ -24,10 +24,43 @@ scene.fog = new THREE.Fog(SKY, 60, 140);
 
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 400);
 
-scene.add(new THREE.HemisphereLight(0xffffff, 0x777788, 1.15));
+const hemi = new THREE.HemisphereLight(0xffffff, 0x777788, 1.15);
+scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffffff, 1.1);
 sun.position.set(0.6, 1, 0.4);
 scene.add(sun);
+
+// --- Day/night cycle ---------------------------------------------------------
+// Server-synced world time: 0 sunrise, 0.25 noon, 0.5 sunset, 0.75 midnight.
+// The client advances it locally and snaps to the server's `time` messages.
+
+const DAY_SECONDS = 600;
+let worldTime = 0.1;
+
+const SKY_DAY = new THREE.Color(0x87ceeb);
+const SKY_NIGHT = new THREE.Color(0x0b1026);
+const SKY_DUSK = new THREE.Color(0xf08a4b);
+const skyColor = new THREE.Color();
+
+const smoothstep = (a, b, x) => {
+  const t = Math.min(Math.max((x - a) / (b - a), 0), 1);
+  return t * t * (3 - 2 * t);
+};
+
+function updateSky(dt) {
+  worldTime = (worldTime + dt / DAY_SECONDS) % 1;
+  const ang = worldTime * Math.PI * 2;
+  const elev = Math.sin(ang); // sun height, -1..1
+
+  sun.position.set(Math.cos(ang) * 0.7, elev, 0.35);
+  sun.intensity = Math.max(0, elev) * 1.1;
+  hemi.intensity = 0.18 + 0.97 * smoothstep(-0.08, 0.25, elev);
+
+  skyColor.lerpColors(SKY_NIGHT, SKY_DAY, smoothstep(-0.12, 0.25, elev));
+  skyColor.lerp(SKY_DUSK, Math.exp(-((elev / 0.16) ** 2)) * 0.55); // dawn/dusk glow
+  scene.background.copy(skyColor);
+  scene.fog.color.copy(skyColor);
+}
 
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
@@ -133,6 +166,9 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
         break;
       case 'block_update':
         applyEdit(m.x, m.y, m.z, m.id);
+        break;
+      case 'time':
+        worldTime = m.t;
         break;
     }
   },
@@ -277,6 +313,7 @@ function frame() {
     if (hit) highlight.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
   }
 
+  updateSky(dt);
   remotePlayers.update(dt);
   chunkMeshes.process(4);
 

@@ -91,8 +91,14 @@ restarts — untouched terrain keeps regenerating from the seed and costs no
 disk at all.
 
 **Protocol** — JSON text frames for control messages (`hello`, `chunk_req`,
-`set_block`, `pos` → `welcome`, `block_update`, `player_join/pos/leave`) and
-binary frames for chunk payloads: `[kind u8][cx i32][cz i32][16384 block bytes]`.
+`set_block`, `pos` → `welcome`, `block_update`, `player_join/pos/leave`,
+`time`) and binary frames for chunk payloads:
+`[kind u8][cx i32][cz i32][16384 block bytes]`.
+
+**Day/night** — one in-game day lasts ten minutes. The server owns the clock
+and rebroadcasts it every five seconds; clients advance it locally between
+corrections and drive the sun's angle and intensity, hemisphere light, and
+sky/fog color from it, with a warm glow pass around dawn and dusk.
 
 **Client rendering** — a 16px-per-tile texture atlas is generated procedurally
 on a canvas at startup (no asset files). The mesher emits only block faces
@@ -109,6 +115,6 @@ Amanatides & Woo voxel raycast, so picking is exact rather than mesh-based.
 - [x] Caves and ores
 - [x] Chunk persistence to disk (world survives server restarts)
 - [ ] Greedy meshing + meshing in a web worker
-- [ ] Day/night cycle
+- [x] Day/night cycle
 - [ ] Player avatars with skins, walk animation
 - [ ] Rust → wasm meshing module shared between client and server

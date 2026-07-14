@@ -49,6 +49,10 @@ pub enum ServerMsg {
         z: i32,
         id: u8,
     },
+    /// World time as a fraction of a day: 0 sunrise, 0.25 noon, 0.5 sunset.
+    Time {
+        t: f32,
+    },
 }
 
 pub const BIN_CHUNK: u8 = 1;

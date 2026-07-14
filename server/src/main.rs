@@ -21,13 +21,23 @@ struct Client {
     pos: [f32; 3],
 }
 
+/// One in-game day lasts ten minutes of wall clock.
+const DAY_SECONDS: f64 = 600.0;
+
 struct Server {
     world: Mutex<World>,
     clients: Mutex<HashMap<u32, Client>>,
     next_id: AtomicU32,
+    started: std::time::Instant,
 }
 
 impl Server {
+    /// Fraction of the current day: 0 sunrise, 0.25 noon, 0.5 sunset.
+    /// Starts mid-morning so new worlds open in daylight.
+    fn world_time(&self) -> f32 {
+        ((self.started.elapsed().as_secs_f64() / DAY_SECONDS + 0.1) % 1.0) as f32
+    }
+
     fn send_to(&self, id: u32, msg: &ServerMsg) {
         let text = serde_json::to_string(msg).unwrap();
         if let Some(c) = self.clients.lock().unwrap().get(&id) {
@@ -54,6 +64,19 @@ async fn main() {
         world: Mutex::new(world),
         clients: Mutex::new(HashMap::new()),
         next_id: AtomicU32::new(1),
+        started: std::time::Instant::now(),
+    });
+
+    // Keep everyone's day/night cycle in sync; clients advance time locally
+    // between these corrections.
+    let time_server = server.clone();
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(5));
+        loop {
+            tick.tick().await;
+            let t = time_server.world_time();
+            time_server.broadcast(&ServerMsg::Time { t }, None);
+        }
     });
 
     let listener = TcpListener::bind(addr).await.expect("failed to bind");
@@ -125,6 +148,7 @@ async fn handle_client(server: Arc<Server>, stream: TcpStream) -> Result<(), Err
     );
 
     server.send_to(id, &ServerMsg::Welcome { id, spawn, players });
+    server.send_to(id, &ServerMsg::Time { t: server.world_time() });
     server.broadcast(
         &ServerMsg::PlayerJoin {
             id,
