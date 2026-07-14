@@ -101,10 +101,18 @@ corrections and drive the sun's angle and intensity, hemisphere light, and
 sky/fog color from it, with a warm glow pass around dawn and dusk.
 
 **Client rendering** — a 16px-per-tile texture atlas is generated procedurally
-on a canvas at startup (no asset files). The mesher emits only block faces
-adjacent to air or see-through blocks, with per-face shading baked into vertex
-colors, split into opaque and transparent passes. Mesh rebuilds are budgeted
-per frame; chunks stream in nearest-first and are evicted when far away.
+on a canvas at startup (no asset files). Meshing happens in a web worker: the
+main thread snapshots dirty chunks (blocks plus one-block neighbor borders)
+and gets back transferable vertex buffers, so even a burst of chunk arrivals
+never blocks a frame. The mesher is greedy — coplanar faces with the same
+texture and transparency merge into maximal rectangles, which melts real
+terrain to ~18% of the naive visible-face geometry. Merged quads carry uvs in
+block units plus a per-vertex atlas-tile index; a small patch to the Lambert
+shader wraps the uv with `fract()` inside the chosen tile, so textures tile
+across merged quads (nearest filtering, no mipmaps, so the trick is
+artifact-free). Per-face shading is baked into vertex colors, opaque and
+transparent passes are separate meshes; chunks stream in nearest-first and are
+evicted when far away.
 
 **Physics** — the player is a 0.6×1.8 AABB integrated per axis against the
 voxel grid (gravity, jumping, swimming). Block targeting uses an
@@ -114,7 +122,7 @@ Amanatides & Woo voxel raycast, so picking is exact rather than mesh-based.
 
 - [x] Caves and ores
 - [x] Chunk persistence to disk (world survives server restarts)
-- [ ] Greedy meshing + meshing in a web worker
+- [x] Greedy meshing + meshing in a web worker
 - [x] Day/night cycle
 - [ ] Player avatars with skins, walk animation
 - [ ] Rust → wasm meshing module shared between client and server

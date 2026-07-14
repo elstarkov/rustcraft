@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { AIR, CHUNK_SIZE, WATER } from './blocks.js';
 import { buildAtlas } from './textures.js';
 import { World, chunkKey } from './world.js';
-import { makeMaterials, meshChunk } from './mesher.js';
+import { buildGeometry, makeMaterials } from './mesher.js';
+import { borderSlices } from './mesh-core.js';
 import { Player } from './player.js';
 import { HUD } from './hud.js';
 import { Net } from './net.js';
@@ -75,11 +76,16 @@ const hud = new HUD(atlasCanvas);
 const player = new Player(world, camera);
 const remotePlayers = new RemotePlayers(scene);
 
-// Owns the THREE meshes for chunks and rebuilds them when marked dirty.
+// Owns the THREE meshes for chunks. Meshing itself happens in a web worker:
+// process() snapshots dirty chunks (blocks + neighbor borders) to the worker,
+// results come back as transferable typed arrays and swap in here.
 class ChunkMeshes {
   constructor() {
     this.meshes = new Map(); // key -> { opaque?, transparent? }
     this.dirty = new Set();
+    this.inFlight = new Set();
+    this.worker = new Worker(new URL('./mesh-worker.js', import.meta.url), { type: 'module' });
+    this.worker.onmessage = (e) => this.onResult(e.data);
   }
 
   markDirty(key) {
@@ -97,28 +103,39 @@ class ChunkMeshes {
     this.meshes.delete(key);
   }
 
-  rebuild(key) {
-    this.remove(key);
+  onResult({ key, opaque, transparent }) {
+    this.inFlight.delete(key);
     const [cx, cz] = key.split(',').map(Number);
-    if (!world.hasChunk(cx, cz)) return;
-    const { opaque, transparent } = meshChunk(world, cx, cz);
+    if (!world.hasChunk(cx, cz)) return; // dropped while the worker meshed it
+    this.remove(key);
     const entry = {};
     if (opaque) {
-      entry.opaque = new THREE.Mesh(opaque, materials.opaque);
+      entry.opaque = new THREE.Mesh(buildGeometry(opaque), materials.opaque);
       scene.add(entry.opaque);
     }
     if (transparent) {
-      entry.transparent = new THREE.Mesh(transparent, materials.transparent);
+      entry.transparent = new THREE.Mesh(buildGeometry(transparent), materials.transparent);
       scene.add(entry.transparent);
     }
     this.meshes.set(key, entry);
   }
 
-  // Spread mesh rebuilds across frames to avoid hitches.
-  process(limit = 2) {
+  // Feed dirty chunks to the worker. A chunk edited while its job is in
+  // flight stays dirty and is resubmitted when the stale result lands.
+  process(limit = 4) {
     for (const key of this.dirty) {
+      if (this.inFlight.has(key)) continue;
+      const chunk = world.chunks.get(key);
       this.dirty.delete(key);
-      this.rebuild(key);
+      if (!chunk) continue;
+      const [cx, cz] = key.split(',').map(Number);
+      const blocks = chunk.slice();
+      const borders = borderSlices((ncx, ncz) => world.chunks.get(chunkKey(ncx, ncz)), cx, cz);
+      this.inFlight.add(key);
+      this.worker.postMessage(
+        { key, cx, cz, blocks, borders },
+        [blocks.buffer, ...Object.values(borders).filter(Boolean).map((b) => b.buffer)],
+      );
       if (--limit <= 0) break;
     }
   }
