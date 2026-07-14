@@ -13,6 +13,9 @@ export const LEAVES = 6;
 export const PLANKS = 7;
 export const GLASS = 8;
 export const WATER = 9;
+export const COAL_ORE = 10;
+export const IRON_ORE = 11;
+export const GOLD_ORE = 12;
 
 // Atlas tile index per face: [top, bottom, side]
 export const BLOCKS = {
@@ -25,6 +28,9 @@ export const BLOCKS = {
   [PLANKS]: { name: 'planks', tiles: [8, 8, 8] },
   [GLASS]: { name: 'glass', tiles: [9, 9, 9], seeThrough: true },
   [WATER]: { name: 'water', tiles: [10, 10, 10], seeThrough: true, liquid: true },
+  [COAL_ORE]: { name: 'coal ore', tiles: [11, 11, 11] },
+  [IRON_ORE]: { name: 'iron ore', tiles: [12, 12, 12] },
+  [GOLD_ORE]: { name: 'gold ore', tiles: [13, 13, 13] },
 };
 
 // What the hotbar offers, in slot order.

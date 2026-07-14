@@ -20,6 +20,9 @@ pub mod block {
     pub const PLANKS: u8 = 7;
     pub const GLASS: u8 = 8;
     pub const WATER: u8 = 9;
+    pub const COAL_ORE: u8 = 10;
+    pub const IRON_ORE: u8 = 11;
+    pub const GOLD_ORE: u8 = 12;
 
     /// Blocks a client is allowed to place. Water flows only from world gen.
     pub fn placeable(id: u8) -> bool {
@@ -56,6 +59,8 @@ impl Chunk {
 pub struct World {
     seed: u32,
     noise: Perlin,
+    cave: Perlin,
+    tunnel: Perlin,
     chunks: HashMap<(i32, i32), Chunk>,
     save_dir: PathBuf,
 }
@@ -66,6 +71,8 @@ impl World {
         World {
             seed,
             noise: Perlin::new(seed),
+            cave: Perlin::new(seed.wrapping_add(1)),
+            tunnel: Perlin::new(seed.wrapping_add(2)),
             chunks: HashMap::new(),
             save_dir,
         }
@@ -110,8 +117,17 @@ impl World {
 
     /// Deterministic per-column hash used for tree placement.
     fn column_hash(&self, wx: i32, wz: i32) -> u32 {
+        self.hash(&[wx as u32, wz as u32])
+    }
+
+    /// Per-cell hash used for ore veins (fed 2x2x2 block cell coordinates).
+    fn cell_hash(&self, x: i32, y: i32, z: i32) -> u32 {
+        self.hash(&[x as u32, y as u32, z as u32])
+    }
+
+    fn hash(&self, vals: &[u32]) -> u32 {
         let mut h = self.seed ^ 0x9e37_79b9;
-        for v in [wx as u32, wz as u32] {
+        for &v in vals {
             h ^= v.wrapping_mul(0x85eb_ca6b);
             h = h.rotate_left(13).wrapping_mul(5).wrapping_add(0xe654_6b64);
         }
@@ -123,12 +139,14 @@ impl World {
 
     fn generate(&self, cx: i32, cz: i32) -> Chunk {
         let mut chunk = Chunk::new();
+        let mut heights = [0i32; CHUNK_SIZE * CHUNK_SIZE];
 
         for lz in 0..CHUNK_SIZE {
             for lx in 0..CHUNK_SIZE {
                 let wx = cx * CHUNK_SIZE as i32 + lx as i32;
                 let wz = cz * CHUNK_SIZE as i32 + lz as i32;
                 let h = self.height_at(wx, wz);
+                heights[lz * CHUNK_SIZE + lx] = h;
 
                 for y in 0..=h.min(WORLD_HEIGHT as i32 - 1) {
                     let id = if y == h {
@@ -158,15 +176,58 @@ impl World {
             }
         }
 
+        // Caves and ores. Caverns open up where 3D noise runs hot; winding
+        // tunnels where two noise fields cross zero together. Ocean and lake
+        // floors keep a 3-block seal (there is no fluid sim, so water must
+        // never sit on carved air). Ore veins come from hashing 2x2x2 cells
+        // so they clump instead of scattering single blocks.
+        for lz in 0..CHUNK_SIZE {
+            for lx in 0..CHUNK_SIZE {
+                let wx = cx * CHUNK_SIZE as i32 + lx as i32;
+                let wz = cz * CHUNK_SIZE as i32 + lz as i32;
+                let h = heights[lz * CHUNK_SIZE + lx];
+                let top = if h <= SEA_LEVEL + 1 { h - 3 } else { h };
+
+                for y in 2..=top.min(WORLD_HEIGHT as i32 - 1) {
+                    let (fx, fy, fz) = (wx as f64, y as f64, wz as f64);
+                    let cavern = self.cave.get([fx * 0.075, fy * 0.11, fz * 0.075]) > 0.58;
+                    let tunnel = self.cave.get([fx * 0.045, fy * 0.06, fz * 0.045]).abs() < 0.075
+                        && self.tunnel.get([fx * 0.045, fy * 0.06, fz * 0.045]).abs() < 0.075;
+                    if cavern || tunnel {
+                        chunk.set(lx, y as usize, lz, block::AIR);
+                        continue;
+                    }
+
+                    if chunk.get(lx, y as usize, lz) != block::STONE {
+                        continue;
+                    }
+                    let cell = self.cell_hash(wx >> 1, y >> 1, wz >> 1);
+                    let ore = if y <= 14 && cell % 130 == 0 {
+                        block::GOLD_ORE
+                    } else if y <= 28 && cell % 70 == 0 {
+                        block::IRON_ORE
+                    } else if y <= 40 && cell % 40 == 0 {
+                        block::COAL_ORE
+                    } else {
+                        continue;
+                    };
+                    chunk.set(lx, y as usize, lz, ore);
+                }
+            }
+        }
+
         // Trees: only where the whole canopy (radius 2) fits inside this chunk,
         // so generation never depends on neighboring chunks.
         for lz in 2..CHUNK_SIZE - 2 {
             for lx in 2..CHUNK_SIZE - 2 {
                 let wx = cx * CHUNK_SIZE as i32 + lx as i32;
                 let wz = cz * CHUNK_SIZE as i32 + lz as i32;
-                let h = self.height_at(wx, wz);
+                let h = heights[lz * CHUNK_SIZE + lx];
                 if h <= SEA_LEVEL + 1 {
                     continue; // no trees on beaches or under water
+                }
+                if chunk.get(lx, h as usize, lz) != block::GRASS {
+                    continue; // surface was carved away by a cave mouth
                 }
                 let hash = self.column_hash(wx, wz);
                 if hash % 97 != 0 {

@@ -81,7 +81,10 @@ cache.
 **World** — chunks are 16×16×64 blocks. Terrain comes from three octaves of
 Perlin noise; columns get grass/dirt/stone layering, sand near the waterline,
 water up to sea level, and deterministic tree placement (same seed → same
-world). Chunks generate lazily on first request and are cached with any player
+world). Caves are carved by 3D noise — caverns where one field runs hot,
+winding tunnels where two fields cross zero together — with a sealed floor
+under oceans and lakes so water never rests on air. Coal, iron, and gold veins
+come from hashed 2×2×2 cells in stone, each rarer and deeper than the last. Chunks generate lazily on first request and are cached with any player
 edits applied. Edited chunks are written through to `server/world/` as raw
 16 KB files and loaded from disk before regeneration, so builds survive server
 restarts — untouched terrain keeps regenerating from the seed and costs no
@@ -103,7 +106,7 @@ Amanatides & Woo voxel raycast, so picking is exact rather than mesh-based.
 
 ## Roadmap
 
-- [ ] Caves and ores
+- [x] Caves and ores
 - [x] Chunk persistence to disk (world survives server restarts)
 - [ ] Greedy meshing + meshing in a web worker
 - [ ] Day/night cycle

@@ -5,7 +5,8 @@ export const ATLAS_TILES = 4; // 4x4 grid
 
 // Tile indices (see blocks.js):
 // 0 grass-top, 1 dirt, 2 grass-side, 3 stone, 4 sand,
-// 5 log-side, 6 log-top, 7 leaves, 8 planks, 9 glass, 10 water
+// 5 log-side, 6 log-top, 7 leaves, 8 planks, 9 glass, 10 water,
+// 11 coal ore, 12 iron ore, 13 gold ore
 
 function px(ctx, x, y, r, g, b, a = 1) {
   ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
@@ -108,6 +109,23 @@ export function buildAtlas() {
       px(ctx, ox + x, oy + y, 40 + d, 94 + d, 190 + d, 0.72);
     }
   }
+
+  // Ores: stone with 2x2 mineral flecks.
+  const oreTile = (i, [r, g, b]) => {
+    const [tx, ty] = at(i);
+    noisyTile(ctx, tx, ty, [128, 128, 130], 26, rand);
+    for (let n = 0; n < 5; n++) {
+      const fx = 1 + Math.floor(rand() * (TILE - 3));
+      const fy = 1 + Math.floor(rand() * (TILE - 3));
+      for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) {
+        const d = (rand() - 0.5) * 28;
+        px(ctx, tx + fx + dx, ty + fy + dy, r + d, g + d, b + d);
+      }
+    }
+  };
+  oreTile(11, [43, 43, 47]); // coal
+  oreTile(12, [216, 168, 138]); // iron
+  oreTile(13, [246, 208, 60]); // gold
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.magFilter = THREE.NearestFilter;
