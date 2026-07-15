@@ -74,9 +74,9 @@ cache.
 | WASD | move |
 | mouse | look |
 | SPACE | jump / swim up |
-| left click | break block |
+| hold left click | mine block (faster with the right tool) |
 | right click | place block |
-| 1–8 / wheel | select block |
+| 1–8 / wheel | select block or tool |
 
 ## How it works
 
@@ -122,6 +122,14 @@ than the JS mesher with byte-identical output — and `mesh-core.js` is the
 fallback if instantiation fails. The `.wasm` is checked in, so running the
 client needs no Rust toolchain; rebuild it with `npm run build:wasm` (needs
 `rustup target add wasm32-unknown-unknown`).
+
+**Items & mining** — the hotbar holds eight blocks plus four tools (pickaxe,
+shovel, axe, sword — scroll past the blocks to reach them). Breaking is timed:
+every block has a hardness (sand is half a second bare-handed, ores are
+several), the matching tool mines its block class 5× faster, and crack stages
+overlay the block while you hold the button. The sword mines nothing faster —
+it's for fighting. There is no crafting or inventory yet; every item is always
+available, and placing stays instant.
 
 **Players** — remote players are blocky avatars (head, body, arms, legs) with
 deterministic per-id skins: shirt and pants colors from a golden-angle hue

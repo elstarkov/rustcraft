@@ -6,6 +6,7 @@ import { buildGeometry, makeMaterials } from './mesher.js';
 import { borderSlices } from './mesh-core.js';
 import { Player } from './player.js';
 import { HUD } from './hud.js';
+import { miningTime } from './items.js';
 import { Net } from './net.js';
 import { RemotePlayers } from './players.js';
 
@@ -178,7 +179,7 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
         spawned = true;
         overlayMsg.innerHTML =
           'click to play<br><br>WASD move · SPACE jump/swim · mouse look<br>' +
-          'left click break · right click place · 1-8 / wheel select block';
+          'hold left click mine · right click place · 1-8 / wheel select item';
         break;
       case 'player_join':
         remotePlayers.add(m.id, m.name, m.pos);
@@ -265,27 +266,36 @@ document.addEventListener('pointerlockchange', () => {
   const locked = document.pointerLockElement === renderer.domElement;
   overlay.classList.toggle('hidden', locked);
   if (locked) hud.show();
+  else miningDown = false;
 });
 document.addEventListener('mousemove', (e) => {
   if (document.pointerLockElement === renderer.domElement) player.onMouseMove(e);
 });
 document.addEventListener('contextmenu', (e) => e.preventDefault());
 
+// Left button holds to mine (handled in the frame loop); right button places.
+let miningDown = false;
+
 document.addEventListener('mousedown', (e) => {
   if (document.pointerLockElement !== renderer.domElement || !spawned) return;
+  if (e.button === 0) {
+    miningDown = true;
+    return;
+  }
+  if (e.button !== 2) return;
+  const block = hud.selectedBlock;
+  if (block == null) return; // a tool is in hand
   const hit = player.raycast();
   if (!hit) return;
-  if (e.button === 0 && hit.y > 0) {
-    applyEdit(hit.x, hit.y, hit.z, AIR); // optimistic; server echoes the same
-    net.setBlock(hit.x, hit.y, hit.z, AIR);
-  } else if (e.button === 2) {
-    const [px, py, pz] = [hit.x + hit.face[0], hit.y + hit.face[1], hit.z + hit.face[2]];
-    const current = world.getBlock(px, py, pz);
-    if ((current === AIR || current === WATER) && !player.blockIntersectsPlayer(px, py, pz)) {
-      applyEdit(px, py, pz, hud.selectedBlock);
-      net.setBlock(px, py, pz, hud.selectedBlock);
-    }
+  const [px, py, pz] = [hit.x + hit.face[0], hit.y + hit.face[1], hit.z + hit.face[2]];
+  const current = world.getBlock(px, py, pz);
+  if ((current === AIR || current === WATER) && !player.blockIntersectsPlayer(px, py, pz)) {
+    applyEdit(px, py, pz, block);
+    net.setBlock(px, py, pz, block);
   }
+});
+document.addEventListener('mouseup', (e) => {
+  if (e.button === 0) miningDown = false;
 });
 
 window.addEventListener('keydown', (e) => {
@@ -301,6 +311,73 @@ const highlight = new THREE.LineSegments(
 );
 highlight.visible = false;
 scene.add(highlight);
+
+// --- Mining: hold to break, crack overlay while it progresses ----------------
+
+function makeCrackTexture(stage) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 16;
+  canvas.height = 16;
+  const ctx = canvas.getContext('2d');
+  let s = 91 + stage * 7;
+  const rand = () => {
+    s = (s * 1103515245 + 12345) & 0x7fffffff;
+    return s / 0x7fffffff;
+  };
+  ctx.strokeStyle = 'rgba(18,14,10,0.85)';
+  for (let i = 0; i <= stage + 1; i++) {
+    ctx.beginPath();
+    let x = 8 + (rand() - 0.5) * 4;
+    let y = 8 + (rand() - 0.5) * 4;
+    ctx.moveTo(x, y);
+    for (let seg = 0; seg < 3 + stage; seg++) {
+      x += (rand() - 0.5) * 9;
+      y += (rand() - 0.5) * 9;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.NearestFilter;
+  return texture;
+}
+
+const crackTextures = [0, 1, 2, 3].map(makeCrackTexture);
+const crackBox = new THREE.Mesh(
+  new THREE.BoxGeometry(1.006, 1.006, 1.006),
+  new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false, map: crackTextures[0] }),
+);
+crackBox.visible = false;
+scene.add(crackBox);
+
+const mining = { key: null, progress: 0, time: Infinity };
+
+function updateMining(hit, dt) {
+  if (!miningDown || !hit || hit.y <= 0) {
+    mining.key = null;
+    crackBox.visible = false;
+    return;
+  }
+  const key = `${hit.x},${hit.y},${hit.z}`;
+  if (mining.key !== key) {
+    mining.key = key;
+    mining.progress = 0;
+    mining.time = miningTime(hit.id, hud.selectedTool);
+  }
+  mining.progress += dt;
+  if (mining.progress >= mining.time) {
+    applyEdit(hit.x, hit.y, hit.z, AIR); // optimistic; server echoes the same
+    net.setBlock(hit.x, hit.y, hit.z, AIR);
+    mining.key = null;
+    crackBox.visible = false;
+    return;
+  }
+  const stage = Math.min(3, Math.floor((mining.progress / mining.time) * 4));
+  crackBox.material.map = crackTextures[stage];
+  crackBox.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
+  crackBox.visible = true;
+}
 
 // --- Main loop ---------------------------------------------------------------
 
@@ -336,6 +413,7 @@ function frame() {
     const hit = document.pointerLockElement === renderer.domElement ? player.raycast() : null;
     highlight.visible = hit !== null;
     if (hit) highlight.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
+    updateMining(hit, dt);
   }
 
   updateSky(dt);
@@ -362,4 +440,7 @@ function frame() {
 frame();
 
 // Debug handle for tooling and console poking.
-window.__rustcraft = { world, player, chunkMeshes, remotePlayers };
+window.__rustcraft = {
+  world, player, chunkMeshes, remotePlayers, hud, scene,
+  crack: { box: crackBox, textures: crackTextures },
+};
