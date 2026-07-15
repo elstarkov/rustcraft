@@ -295,6 +295,29 @@ impl World {
         true
     }
 
+    pub fn block_at(&mut self, x: i32, y: i32, z: i32) -> u8 {
+        if y < 0 || y as usize >= WORLD_HEIGHT {
+            return block::AIR;
+        }
+        let (cx, cz) = (
+            x.div_euclid(CHUNK_SIZE as i32),
+            z.div_euclid(CHUNK_SIZE as i32),
+        );
+        self.chunk(cx, cz).get(
+            x.rem_euclid(CHUNK_SIZE as i32) as usize,
+            y as usize,
+            z.rem_euclid(CHUNK_SIZE as i32) as usize,
+        )
+    }
+
+    /// Highest solid (non-air, non-water) block in a column, if any.
+    pub fn surface_y(&mut self, x: i32, z: i32) -> Option<i32> {
+        (0..WORLD_HEIGHT as i32).rev().find(|&y| {
+            let id = self.block_at(x, y, z);
+            id != block::AIR && id != block::WATER
+        })
+    }
+
     /// A safe place to drop a new player: on top of the terrain near origin.
     pub fn spawn_point(&mut self) -> [f32; 3] {
         let (x, z) = (8, 8);

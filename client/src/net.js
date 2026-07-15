@@ -46,6 +46,10 @@ export class Net {
     this.send({ type: 'set_block', x, y, z, id });
   }
 
+  attack(id, tool) {
+    this.send({ type: 'attack', id, tool });
+  }
+
   sendPos(pos, yaw, pitch) {
     this.send({ type: 'pos', x: pos.x, y: pos.y, z: pos.z, yaw, pitch });
   }

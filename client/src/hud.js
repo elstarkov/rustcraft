@@ -8,7 +8,9 @@ export class HUD {
     this.crosshair = document.getElementById('crosshair');
     this.debugEl = document.getElementById('debug');
     this.hotbarEl = document.getElementById('hotbar');
+    this.heartsEl = document.getElementById('hearts');
     this.slots = [];
+    this.setHealth(20);
 
     // Blocks first (keys 1-8), then tools; the wheel cycles everything.
     this.items = [
@@ -58,6 +60,14 @@ export class HUD {
     this.crosshair.classList.remove('hidden');
     this.hotbarEl.classList.remove('hidden');
     this.debugEl.classList.remove('hidden');
+    this.heartsEl.classList.remove('hidden');
+  }
+
+  /// 20 hp = ten hearts.
+  setHealth(hp) {
+    const full = Math.min(10, Math.max(0, Math.ceil(hp / 2)));
+    this.heartsEl.innerHTML =
+      '♥'.repeat(full) + `<span class="lost">${'♥'.repeat(10 - full)}</span>`;
   }
 
   setDebug(text) {

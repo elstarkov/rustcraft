@@ -8,6 +8,8 @@ pub enum ClientMsg {
     ChunkReq { cx: i32, cz: i32 },
     SetBlock { x: i32, y: i32, z: i32, id: u8 },
     Pos { x: f32, y: f32, z: f32, yaw: f32, pitch: f32 },
+    /// Swing at a mob. `tool` is the held tool kind ("sword", ...), if any.
+    Attack { id: u32, tool: Option<String> },
 }
 
 #[derive(Serialize, Clone)]
@@ -52,6 +54,29 @@ pub enum ServerMsg {
     /// World time as a fraction of a day: 0 sunrise, 0.25 noon, 0.5 sunset.
     Time {
         t: f32,
+    },
+    MobSpawn {
+        id: u32,
+        kind: String,
+        x: f32,
+        y: f32,
+        z: f32,
+    },
+    /// Position batch for all live mobs, sent every AI tick.
+    Mobs {
+        list: Vec<(u32, f32, f32, f32, f32)>, // id, x, y, z, yaw
+    },
+    MobHurt {
+        id: u32,
+    },
+    MobGone {
+        id: u32,
+    },
+    Health {
+        hp: i32,
+    },
+    Respawn {
+        spawn: [f32; 3],
     },
 }
 

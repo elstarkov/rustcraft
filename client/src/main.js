@@ -9,6 +9,7 @@ import { HUD } from './hud.js';
 import { miningTime } from './items.js';
 import { Net } from './net.js';
 import { RemotePlayers } from './players.js';
+import { RemoteMobs } from './mobs.js';
 
 const app = document.getElementById('app');
 const overlay = document.getElementById('overlay');
@@ -76,6 +77,18 @@ const world = new World();
 const hud = new HUD(atlasCanvas);
 const player = new Player(world, camera);
 const remotePlayers = new RemotePlayers(scene);
+const remoteMobs = new RemoteMobs(scene);
+const vignette = document.getElementById('vignette');
+let hp = 20;
+
+function damageFlash() {
+  vignette.style.transition = 'none';
+  vignette.style.opacity = '1';
+  requestAnimationFrame(() => {
+    vignette.style.transition = 'opacity 0.5s ease-out';
+    vignette.style.opacity = '0';
+  });
+}
 
 // Owns the THREE meshes for chunks. Meshing itself happens in a web worker:
 // process() snapshots dirty chunks (blocks + neighbor borders) to the worker,
@@ -196,6 +209,27 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
       case 'time':
         worldTime = m.t;
         break;
+      case 'mob_spawn':
+        remoteMobs.add(m.id, m.kind, [m.x, m.y, m.z]);
+        break;
+      case 'mobs':
+        remoteMobs.updateAll(m.list);
+        break;
+      case 'mob_hurt':
+        remoteMobs.hurt(m.id);
+        break;
+      case 'mob_gone':
+        remoteMobs.remove(m.id);
+        break;
+      case 'health':
+        if (m.hp < hp) damageFlash();
+        hp = m.hp;
+        hud.setHealth(hp);
+        break;
+      case 'respawn':
+        player.pos.set(m.spawn[0], m.spawn[1], m.spawn[2]);
+        player.vel.set(0, 0, 0);
+        break;
     }
   },
   onChunk(cx, cz, blocks) {
@@ -279,6 +313,15 @@ let miningDown = false;
 document.addEventListener('mousedown', (e) => {
   if (document.pointerLockElement !== renderer.domElement || !spawned) return;
   if (e.button === 0) {
+    // A mob in reach takes the swing; check it isn't behind the wall in view.
+    const mobHit = remoteMobs.pick(player.eye(), player.lookDir(), 3.5);
+    if (mobHit) {
+      const blockHit = player.raycast(mobHit.dist);
+      if (!blockHit) {
+        net.attack(mobHit.id, hud.selectedTool?.kind ?? null);
+        return;
+      }
+    }
     miningDown = true;
     return;
   }
@@ -418,6 +461,7 @@ function frame() {
 
   updateSky(dt);
   remotePlayers.update(dt);
+  remoteMobs.update(dt);
   chunkMeshes.process(4);
 
   fpsFrames++;
@@ -431,7 +475,7 @@ function frame() {
   hud.setDebug(
     `${fps} fps  xyz ${x.toFixed(1)} ${y.toFixed(1)} ${z.toFixed(1)}  ` +
       `chunk ${Math.floor(x / CHUNK_SIZE)},${Math.floor(z / CHUNK_SIZE)}  ` +
-      `players ${remotePlayers.players.size + 1}`,
+      `players ${remotePlayers.players.size + 1}  mobs ${remoteMobs.mobs.size}`,
   );
 
   renderer.render(scene, camera);
@@ -441,6 +485,6 @@ frame();
 
 // Debug handle for tooling and console poking.
 window.__rustcraft = {
-  world, player, chunkMeshes, remotePlayers, hud, scene,
+  world, player, chunkMeshes, remotePlayers, remoteMobs, hud, scene,
   crack: { box: crackBox, textures: crackTextures },
 };

@@ -3,8 +3,8 @@
 A Minecraft-style multiplayer voxel game with a hybrid architecture:
 
 - **`server/`** — authoritative game server written in **Rust**. Owns the world:
-  procedural terrain generation, chunk storage, block edits, and player state.
-  Talks to clients over WebSockets.
+  procedural terrain generation, chunk storage, block edits, player state, and
+  mob AI. Talks to clients over WebSockets.
 - **`client/`** — browser client written in **JavaScript** with **Three.js**.
   Renders chunks streamed from the server, handles first-person controls,
   physics, and block breaking/placing.
@@ -75,6 +75,7 @@ cache.
 | mouse | look |
 | SPACE | jump / swim up |
 | hold left click | mine block (faster with the right tool) |
+| left click a zombie | attack — sword 6, tools 3, fists 2 |
 | right click | place block |
 | 1–8 / wheel | select block or tool |
 
@@ -131,6 +132,16 @@ overlay the block while you hold the button. The sword mines nothing faster —
 it's for fighting. There is no crafting or inventory yet; every item is always
 available, and placing stays instant.
 
+**Monsters** — zombies spawn on the surface near players at night (the server
+clock decides) and despawn at dawn, when everyone leaves, or after idling too
+long — usually that means one fell into a cave mid-chase. AI runs server-side
+at 10 Hz with the same AABB voxel physics as players: they wander, chase
+anyone within 3D range, hop single blocks (the jump speed is tuned for the
+coarse tick), float across ponds, and swing for 3 damage in melee range.
+Players carry 20 hp rendered as hearts, flash red when hit, and respawn at
+world spawn on death. Swinging back deals 6 with the sword, 3 with other
+tools, 2 bare-handed, with knockback — a zombie dies after 12.
+
 **Players** — remote players are blocky avatars (head, body, arms, legs) with
 deterministic per-id skins: shirt and pants colors from a golden-angle hue
 walk, one of four skin tones, hair, and an 8×8 pixel face. The walk cycle is
@@ -149,3 +160,7 @@ Amanatides & Woo voxel raycast, so picking is exact rather than mesh-based.
 - [x] Day/night cycle
 - [x] Player avatars with skins, walk animation
 - [x] Rust → wasm meshing module (~5× the JS mesher, JS fallback kept)
+- [x] Tools and timed mining with crack stages
+- [x] Zombies at night, player health and respawn
+- [ ] Item drops, inventory and crafting
+- [ ] More mob types

@@ -42,12 +42,25 @@
         font: 12px ui-monospace, Menlo, monospace; text-shadow: 0 0 3px #000;
         pointer-events: none; white-space: pre;
       }
+      #hearts {
+        position: fixed; left: 50%; bottom: 64px; transform: translateX(-50%);
+        z-index: 5; font-size: 18px; letter-spacing: 2px; color: #e2312f;
+        text-shadow: 0 0 3px #000; pointer-events: none; user-select: none;
+      }
+      #hearts .lost { color: rgba(255, 255, 255, 0.25); }
+      #vignette {
+        position: fixed; inset: 0; z-index: 8; pointer-events: none;
+        opacity: 0; transition: opacity 0.5s ease-out;
+        box-shadow: inset 0 0 120px 40px rgba(190, 0, 0, 0.8);
+      }
     </style>
   </head>
   <body>
     <div id="app"></div>
     <div id="crosshair" class="hidden">+</div>
     <div id="hotbar" class="hidden"></div>
+    <div id="hearts" class="hidden"></div>
+    <div id="vignette"></div>
     <div id="debug" class="hidden"></div>
     <div id="overlay" class="overlay">
       <h1>RUSTCRAFT</h1>

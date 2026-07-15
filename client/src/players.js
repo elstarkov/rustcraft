@@ -21,7 +21,7 @@ function makePalette(id) {
 }
 
 // 8x8 pixel face: skin base, hair fringe, eyes, mouth.
-function makeFaceTexture(palette) {
+export function makeFaceTexture(palette) {
   const canvas = document.createElement('canvas');
   canvas.width = 8;
   canvas.height = 8;
@@ -32,10 +32,10 @@ function makeFaceTexture(palette) {
   ctx.fillRect(0, 0, 8, 2);
   ctx.fillRect(0, 2, 1, 1);
   ctx.fillRect(7, 2, 1, 1);
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = palette.sclera ?? '#ffffff';
   ctx.fillRect(1, 3, 2, 1);
   ctx.fillRect(5, 3, 2, 1);
-  ctx.fillStyle = '#4a3ba0';
+  ctx.fillStyle = palette.eyes ?? '#4a3ba0';
   ctx.fillRect(2, 3, 1, 1);
   ctx.fillRect(5, 3, 1, 1);
   ctx.fillStyle = 'rgba(0,0,0,0.45)';
@@ -56,8 +56,7 @@ function limb(w, h, d, material, x, pivotY) {
   return mesh;
 }
 
-function buildAvatar(id) {
-  const palette = makePalette(id);
+export function buildHumanoid(palette) {
   const skinMat = new THREE.MeshLambertMaterial({ color: palette.skin });
   const hairMat = new THREE.MeshLambertMaterial({ color: palette.hair });
   const shirtMat = new THREE.MeshLambertMaterial({ color: palette.shirt });
@@ -93,7 +92,7 @@ export class RemotePlayers {
 
   add(id, name, pos) {
     if (this.players.has(id)) this.remove(id);
-    const avatar = buildAvatar(id);
+    const avatar = buildHumanoid(makePalette(id));
     avatar.group.add(this.makeNameTag(name));
     avatar.group.position.set(pos[0], pos[1], pos[2]);
     this.scene.add(avatar.group);

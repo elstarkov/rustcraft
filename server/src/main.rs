@@ -1,3 +1,4 @@
+mod mobs;
 mod protocol;
 mod world;
 
@@ -10,15 +11,19 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio_tungstenite::tungstenite::Message;
 
+use mobs::Mob;
 use protocol::{encode_chunk, ClientMsg, PlayerInfo, ServerMsg};
 use world::{block, World};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
+const FULL_HP: i32 = 20;
+
 struct Client {
     tx: UnboundedSender<Message>,
     name: String,
     pos: [f32; 3],
+    hp: i32,
 }
 
 /// One in-game day lasts ten minutes of wall clock.
@@ -27,15 +32,23 @@ const DAY_SECONDS: f64 = 600.0;
 struct Server {
     world: Mutex<World>,
     clients: Mutex<HashMap<u32, Client>>,
+    mobs: Mutex<HashMap<u32, Mob>>,
     next_id: AtomicU32,
+    next_mob_id: AtomicU32,
     started: std::time::Instant,
+    start_frac: f64,
 }
 
 impl Server {
     /// Fraction of the current day: 0 sunrise, 0.25 noon, 0.5 sunset.
-    /// Starts mid-morning so new worlds open in daylight.
+    /// Starts mid-morning so new worlds open in daylight (RUSTCRAFT_TIME
+    /// overrides the starting fraction, handy for testing the night).
     fn world_time(&self) -> f32 {
-        ((self.started.elapsed().as_secs_f64() / DAY_SECONDS + 0.1) % 1.0) as f32
+        ((self.started.elapsed().as_secs_f64() / DAY_SECONDS + self.start_frac) % 1.0) as f32
+    }
+
+    fn is_night(&self) -> bool {
+        (self.world_time() as f64 * std::f64::consts::TAU).sin() < -0.05
     }
 
     fn send_to(&self, id: u32, msg: &ServerMsg) {
@@ -60,11 +73,29 @@ async fn main() {
     let addr = "0.0.0.0:8765";
     let world = World::new(1337, "world".into());
     let saved = world.saved_chunk_count();
+    let start_frac = std::env::var("RUSTCRAFT_TIME")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .unwrap_or(0.1);
     let server = Arc::new(Server {
         world: Mutex::new(world),
         clients: Mutex::new(HashMap::new()),
+        mobs: Mutex::new(HashMap::new()),
         next_id: AtomicU32::new(1),
+        next_mob_id: AtomicU32::new(1),
         started: std::time::Instant::now(),
+        start_frac,
+    });
+
+    // Mob AI runs at 10 Hz.
+    let mob_server = server.clone();
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(std::time::Duration::from_millis(100));
+        let mut rng = mobs::Rng(0x2545_f491 ^ std::process::id());
+        loop {
+            tick.tick().await;
+            tick_mobs(&mob_server, &mut rng);
+        }
     });
 
     // Keep everyone's day/night cycle in sync; clients advance time locally
@@ -91,6 +122,107 @@ async fn main() {
             }
         });
     }
+}
+
+/// One 10 Hz mob tick: despawn, spawn, AI, then broadcasts. Never holds the
+/// clients lock while the world lock is held (chunk requests take world then
+/// clients, so the reverse order would deadlock).
+fn tick_mobs(server: &Server, rng: &mut mobs::Rng) {
+    const DT: f32 = 0.1;
+    let night = server.is_night();
+    let players: Vec<(u32, [f32; 3])> = server
+        .clients
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(&id, c)| (id, c.pos))
+        .collect();
+
+    let mut events: Vec<ServerMsg> = Vec::new();
+    let mut hits: Vec<u32> = Vec::new();
+    {
+        let mut world = server.world.lock().unwrap();
+        let mut mob_map = server.mobs.lock().unwrap();
+
+        // Day breaks, everyone left, wandered too far, or idled too long
+        // (usually fallen into a cave): gone.
+        mob_map.retain(|id, m| {
+            let near_someone = players
+                .iter()
+                .any(|(_, p)| (p[0] - m.pos[0]).hypot(p[2] - m.pos[2]) < 56.0);
+            let keep = night && near_someone && !m.is_stale();
+            if !keep {
+                events.push(ServerMsg::MobGone { id: *id });
+            }
+            keep
+        });
+
+        let cap = (players.len() * 4).min(16);
+        if night && !players.is_empty() && mob_map.len() < cap && rng.unit() < 0.2 {
+            let (_, p) = players[rng.next() as usize % players.len()];
+            let ang = rng.unit() * std::f32::consts::TAU;
+            let dist = 14.0 + rng.unit() * 12.0;
+            let x = (p[0] + ang.cos() * dist).floor() as i32;
+            let z = (p[2] + ang.sin() * dist).floor() as i32;
+            if let Some(pos) = mobs::spawn_spot(&mut world, x, z) {
+                let id = server.next_mob_id.fetch_add(1, Ordering::Relaxed);
+                mob_map.insert(id, Mob::new(id, pos));
+                events.push(ServerMsg::MobSpawn {
+                    id,
+                    kind: "zombie".into(),
+                    x: pos[0],
+                    y: pos[1],
+                    z: pos[2],
+                });
+            }
+        }
+
+        for m in mob_map.values_mut() {
+            if let Some(pid) = m.tick(&mut world, &players, DT, rng) {
+                hits.push(pid);
+            }
+        }
+
+        if !mob_map.is_empty() {
+            events.push(ServerMsg::Mobs {
+                list: mob_map
+                    .values()
+                    .map(|m| (m.id, m.pos[0], m.pos[1], m.pos[2], m.yaw))
+                    .collect(),
+            });
+        }
+    }
+
+    for e in &events {
+        server.broadcast(e, None);
+    }
+    for pid in hits {
+        damage_player(server, pid, mobs::ZOMBIE_DAMAGE);
+    }
+}
+
+fn damage_player(server: &Server, id: u32, dmg: i32) {
+    let spawn = server.world.lock().unwrap().spawn_point();
+    let (hp, died) = {
+        let mut clients = server.clients.lock().unwrap();
+        let Some(c) = clients.get_mut(&id) else { return };
+        c.hp -= dmg;
+        let died = c.hp <= 0;
+        if died {
+            c.hp = FULL_HP;
+            c.pos = spawn;
+        }
+        (c.hp, died)
+    };
+    if died {
+        server.send_to(id, &ServerMsg::Respawn { spawn });
+        // Everyone else sees the body snap back to spawn.
+        server.broadcast(
+            &ServerMsg::PlayerPos { id, x: spawn[0], y: spawn[1], z: spawn[2], yaw: 0.0, pitch: 0.0 },
+            Some(id),
+        );
+    }
+    server.send_to(id, &ServerMsg::Health { hp });
 }
 
 async fn handle_client(server: Arc<Server>, stream: TcpStream) -> Result<(), Error> {
@@ -144,11 +276,13 @@ async fn handle_client(server: Arc<Server>, stream: TcpStream) -> Result<(), Err
             tx: tx.clone(),
             name: name.clone(),
             pos: spawn,
+            hp: FULL_HP,
         },
     );
 
     server.send_to(id, &ServerMsg::Welcome { id, spawn, players });
     server.send_to(id, &ServerMsg::Time { t: server.world_time() });
+    server.send_to(id, &ServerMsg::Health { hp: FULL_HP });
     server.broadcast(
         &ServerMsg::PlayerJoin {
             id,
@@ -204,6 +338,39 @@ fn handle_msg(server: &Server, id: u32, msg: ClientMsg) {
             if server.world.lock().unwrap().set_block(x, y, z, bid) {
                 // Echoed to everyone, sender included: the server is authoritative.
                 server.broadcast(&ServerMsg::BlockUpdate { x, y, z, id: bid }, None);
+            }
+        }
+        ClientMsg::Attack { id: mob_id, tool } => {
+            let Some(ppos) = server.clients.lock().unwrap().get(&id).map(|c| c.pos) else {
+                return;
+            };
+            let dmg = match tool.as_deref() {
+                Some("sword") => 6,
+                Some(_) => 3,
+                None => 2,
+            };
+            let mut outcome = None;
+            {
+                let mut mob_map = server.mobs.lock().unwrap();
+                if let Some(m) = mob_map.get_mut(&mob_id) {
+                    let d2 = (m.pos[0] - ppos[0]).powi(2)
+                        + (m.pos[1] - ppos[1]).powi(2)
+                        + (m.pos[2] - ppos[2]).powi(2);
+                    // Reach check so a client can't snipe across the map.
+                    if d2 <= 30.0 {
+                        m.hp -= dmg;
+                        m.knockback(ppos);
+                        if m.hp <= 0 {
+                            mob_map.remove(&mob_id);
+                            outcome = Some(ServerMsg::MobGone { id: mob_id });
+                        } else {
+                            outcome = Some(ServerMsg::MobHurt { id: mob_id });
+                        }
+                    }
+                }
+            }
+            if let Some(msg) = outcome {
+                server.broadcast(&msg, None);
             }
         }
         ClientMsg::Pos { x, y, z, yaw, pitch } => {
