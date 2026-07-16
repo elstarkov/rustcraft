@@ -25,8 +25,13 @@ pub mod block {
     pub const GOLD_ORE: u8 = 12;
 
     /// Blocks a client is allowed to place. Water flows only from world gen.
+    /// Ores are placeable so mined ore isn't a dead item (no crafting yet).
     pub fn placeable(id: u8) -> bool {
-        matches!(id, GRASS | DIRT | STONE | SAND | LOG | LEAVES | PLANKS | GLASS)
+        matches!(
+            id,
+            GRASS | DIRT | STONE | SAND | LOG | LEAVES | PLANKS | GLASS
+                | COAL_ORE | IRON_ORE | GOLD_ORE
+        )
     }
 }
 

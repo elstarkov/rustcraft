@@ -87,6 +87,11 @@ pub enum ServerMsg {
     DropGone {
         id: u32,
     },
+    /// Full inventory snapshot for one player, sent on join and whenever it
+    /// changes. Only non-zero counts are listed.
+    Inventory {
+        items: Vec<(u8, u32)>, // block id, count
+    },
     Health {
         hp: i32,
     },

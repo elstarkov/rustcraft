@@ -26,6 +26,24 @@ struct Client {
     name: String,
     pos: [f32; 3],
     hp: i32,
+    inventory: HashMap<u8, u32>,
+}
+
+/// New players get some build material: planks and glass have no natural
+/// source until crafting exists, everything else is mined.
+fn starter_kit() -> HashMap<u8, u32> {
+    HashMap::from([(block::PLANKS, 32), (block::GLASS, 16)])
+}
+
+fn inventory_snapshot(c: &Client) -> ServerMsg {
+    ServerMsg::Inventory {
+        items: c
+            .inventory
+            .iter()
+            .filter(|&(_, &n)| n > 0)
+            .map(|(&id, &n)| (id, n))
+            .collect(),
+    }
 }
 
 /// One in-game day lasts ten minutes of wall clock.
@@ -208,23 +226,25 @@ fn tick_mobs(server: &Server, rng: &mut mobs::Rng) {
     }
 }
 
-/// One 10 Hz drop tick: physics for drops still in motion, despawn expired
-/// ones. A drop that settled this tick is included in the batch once more so
-/// clients get its final resting position.
+/// One 10 Hz drop tick: physics for drops still in motion, pickup by
+/// proximity, despawn expired ones. A drop that settled this tick is
+/// included in the batch once more so clients get its final resting
+/// position.
 fn tick_drops(server: &Server) {
     const DT: f32 = 0.1;
+    let players: Vec<(u32, [f32; 3])> = server
+        .clients
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(&id, c)| (id, c.pos))
+        .collect();
+
     let mut events: Vec<ServerMsg> = Vec::new();
+    let mut pickups: Vec<(u32, u8)> = Vec::new();
     {
         let mut world = server.world.lock().unwrap();
         let mut drop_map = server.drops.lock().unwrap();
-
-        drop_map.retain(|id, d| {
-            if d.expired() {
-                events.push(ServerMsg::DropGone { id: *id });
-                return false;
-            }
-            true
-        });
 
         let mut moving = Vec::new();
         for d in drop_map.values_mut() {
@@ -237,10 +257,43 @@ fn tick_drops(server: &Server) {
         if !moving.is_empty() {
             events.push(ServerMsg::Drops { list: moving });
         }
+
+        // Walking over a drop collects it; a short grace after spawning so
+        // the pop-out animation is seen at all.
+        drop_map.retain(|id, d| {
+            if d.expired() {
+                events.push(ServerMsg::DropGone { id: *id });
+                return false;
+            }
+            if d.age < 0.25 {
+                return true;
+            }
+            let collector = players.iter().find(|(_, p)| {
+                (p[0] - d.pos[0]).powi(2)
+                    + (p[1] - d.pos[1]).powi(2)
+                    + (p[2] - d.pos[2]).powi(2)
+                    < 2.25
+            });
+            if let Some(&(pid, _)) = collector {
+                pickups.push((pid, d.item));
+                events.push(ServerMsg::DropGone { id: *id });
+                return false;
+            }
+            true
+        });
     }
 
     for e in &events {
         server.broadcast(e, None);
+    }
+    for (pid, item) in pickups {
+        let snapshot = {
+            let mut clients = server.clients.lock().unwrap();
+            let Some(c) = clients.get_mut(&pid) else { continue };
+            *c.inventory.entry(item).or_insert(0) += 1;
+            inventory_snapshot(c)
+        };
+        server.send_to(pid, &snapshot);
     }
 }
 
@@ -320,12 +373,17 @@ async fn handle_client(server: Arc<Server>, stream: TcpStream) -> Result<(), Err
             name: name.clone(),
             pos: spawn,
             hp: FULL_HP,
+            inventory: starter_kit(),
         },
     );
 
     server.send_to(id, &ServerMsg::Welcome { id, spawn, players });
     server.send_to(id, &ServerMsg::Time { t: server.world_time() });
     server.send_to(id, &ServerMsg::Health { hp: FULL_HP });
+    let inv_msg = server.clients.lock().unwrap().get(&id).map(inventory_snapshot);
+    if let Some(m) = inv_msg {
+        server.send_to(id, &m);
+    }
     let existing_drops: Vec<ServerMsg> = server
         .drops
         .lock()
@@ -388,6 +446,24 @@ fn handle_msg(server: &Server, id: u32, msg: ClientMsg) {
             if !allowed {
                 return;
             }
+            // Placing needs stock. Check-then-consume can't race with itself:
+            // a client's messages are handled serially by its own read loop,
+            // and other players only ever add to someone's inventory.
+            if bid != block::AIR {
+                let has = server
+                    .clients
+                    .lock()
+                    .unwrap()
+                    .get(&id)
+                    .is_some_and(|c| c.inventory.get(&bid).copied().unwrap_or(0) > 0);
+                if !has {
+                    // Revert the sender's optimistic local edit.
+                    let current = server.world.lock().unwrap().block_at(x, y, z);
+                    server.send_to(id, &ServerMsg::BlockUpdate { x, y, z, id: current });
+                    return;
+                }
+            }
+
             let prev = {
                 let mut world = server.world.lock().unwrap();
                 let prev = world.block_at(x, y, z);
@@ -399,8 +475,8 @@ fn handle_msg(server: &Server, id: u32, msg: ClientMsg) {
             // Echoed to everyone, sender included: the server is authoritative.
             server.broadcast(&ServerMsg::BlockUpdate { x, y, z, id: bid }, None);
 
-            // Breaking pops the block out as an item drop.
             if bid == block::AIR {
+                // Breaking pops the block out as an item drop.
                 if let Some(item) = drops::drop_for(prev) {
                     let did = server.next_drop_id.fetch_add(1, Ordering::Relaxed);
                     let mut rng = mobs::Rng(did.wrapping_mul(0x9e37_79b9) ^ 0x517c_c1b7);
@@ -408,6 +484,19 @@ fn handle_msg(server: &Server, id: u32, msg: ClientMsg) {
                     let msg = ServerMsg::DropSpawn { id: did, item, x: d.pos[0], y: d.pos[1], z: d.pos[2] };
                     server.drops.lock().unwrap().insert(did, d);
                     server.broadcast(&msg, None);
+                }
+            } else {
+                // Placing consumes one from stock.
+                let snapshot = {
+                    let mut clients = server.clients.lock().unwrap();
+                    clients.get_mut(&id).map(|c| {
+                        let n = c.inventory.entry(bid).or_insert(0);
+                        *n = n.saturating_sub(1);
+                        inventory_snapshot(c)
+                    })
+                };
+                if let Some(s) = snapshot {
+                    server.send_to(id, &s);
                 }
             }
         }
