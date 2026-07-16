@@ -115,7 +115,11 @@ shader wraps the uv with `fract()` inside the chosen tile, so textures tile
 across merged quads (nearest filtering, no mipmaps, so the trick is
 artifact-free). Per-face shading is baked into vertex colors, opaque and
 transparent passes are separate meshes; chunks stream in nearest-first and are
-evicted when far away.
+evicted when far away. The first-person hand — an arm in your avatar's skin
+holding the selected block or tool — lives in a tiny camera-space scene
+rendered as a second pass over a cleared depth buffer, so it never clips into
+walls; it swings on use, keeps chopping while you mine, bobs as you walk, and
+darkens with the night.
 
 The mesher exists twice: `mesher-wasm/` is a Rust port compiled to a 22 KB
 wasm module (raw pointer ABI, no bindgen) that the worker prefers — ~5× faster
@@ -169,5 +173,6 @@ Amanatides & Woo voxel raycast, so picking is exact rather than mesh-based.
 - [x] Tools and timed mining with crack stages
 - [x] Zombies at night, player health and respawn
 - [x] Item drops and a server-authoritative inventory
+- [x] First-person hand with the held block or tool
 - [ ] Crafting
 - [ ] More mob types

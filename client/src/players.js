@@ -7,7 +7,7 @@ import * as THREE from 'three';
 
 const WALK_SPEED = 5.6; // full swing at the local player's walk speed
 
-function makePalette(id) {
+export function makePalette(id) {
   const hue = ((id * 137.5) % 360) / 360;
   const tones = [[236, 188, 148], [214, 160, 116], [166, 116, 78], [124, 82, 54]];
   const hairs = [0x2c2018, 0x53402a, 0x8a6a3c, 0x1a1a1e, 0x5f2f16];

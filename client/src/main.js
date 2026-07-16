@@ -11,6 +11,7 @@ import { Net } from './net.js';
 import { RemotePlayers } from './players.js';
 import { RemoteMobs } from './mobs.js';
 import { RemoteDrops } from './drops.js';
+import { ViewModel } from './viewmodel.js';
 
 const app = document.getElementById('app');
 const overlay = document.getElementById('overlay');
@@ -70,6 +71,7 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  viewModel.resize(camera.aspect);
 });
 
 const { texture: atlas, canvas: atlasCanvas } = buildAtlas();
@@ -80,6 +82,8 @@ const player = new Player(world, camera);
 const remotePlayers = new RemotePlayers(scene);
 const remoteMobs = new RemoteMobs(scene);
 const remoteDrops = new RemoteDrops(scene, atlas);
+const viewModel = new ViewModel(atlas);
+let hudSelected = -1; // forces the initial viewModel.setItem
 const vignette = document.getElementById('vignette');
 let hp = 20;
 
@@ -190,6 +194,7 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
       case 'welcome':
         player.pos.set(m.spawn[0], m.spawn[1], m.spawn[2]);
         player.vel.set(0, 0, 0);
+        viewModel.setPalette(m.id);
         for (const p of m.players) remotePlayers.add(p.id, p.name, p.pos);
         spawned = true;
         overlayMsg.innerHTML =
@@ -327,6 +332,7 @@ let miningDown = false;
 document.addEventListener('mousedown', (e) => {
   if (document.pointerLockElement !== renderer.domElement || !spawned) return;
   if (e.button === 0) {
+    viewModel.swing();
     // A mob in reach takes the swing; check it isn't behind the wall in view.
     const mobHit = remoteMobs.pick(player.eye(), player.lookDir(), 3.5);
     if (mobHit) {
@@ -351,6 +357,7 @@ document.addEventListener('mousedown', (e) => {
     applyEdit(px, py, pz, block);
     net.setBlock(px, py, pz, block);
     hud.consumeOne(block);
+    viewModel.swing();
   }
 });
 document.addEventListener('mouseup', (e) => {
@@ -473,6 +480,13 @@ function frame() {
     highlight.visible = hit !== null;
     if (hit) highlight.position.set(hit.x + 0.5, hit.y + 0.5, hit.z + 0.5);
     updateMining(hit, dt);
+
+    if (hud.selected !== hudSelected) {
+      hudSelected = hud.selected;
+      viewModel.setItem(hud.items[hudSelected]);
+    }
+    viewModel.matchLight(hemi.intensity, sun.intensity);
+    viewModel.update(dt, Math.hypot(player.vel.x, player.vel.z), miningDown && hit !== null);
   }
 
   updateSky(dt);
@@ -496,12 +510,20 @@ function frame() {
   );
 
   renderer.render(scene, camera);
+  if (spawned) {
+    // The hand renders on top with a cleared depth buffer so it never
+    // clips into nearby world geometry.
+    renderer.autoClear = false;
+    renderer.clearDepth();
+    renderer.render(viewModel.scene, viewModel.camera);
+    renderer.autoClear = true;
+  }
 }
 
 frame();
 
 // Debug handle for tooling and console poking.
 window.__rustcraft = {
-  world, player, chunkMeshes, remotePlayers, remoteMobs, remoteDrops, hud, scene,
+  world, player, chunkMeshes, remotePlayers, remoteMobs, remoteDrops, hud, scene, viewModel,
   crack: { box: crackBox, textures: crackTextures },
 };
