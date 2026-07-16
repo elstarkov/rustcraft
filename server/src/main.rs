@@ -1,3 +1,4 @@
+mod drops;
 mod mobs;
 mod protocol;
 mod world;
@@ -11,6 +12,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio_tungstenite::tungstenite::Message;
 
+use drops::Drop;
 use mobs::Mob;
 use protocol::{encode_chunk, ClientMsg, PlayerInfo, ServerMsg};
 use world::{block, World};
@@ -33,8 +35,10 @@ struct Server {
     world: Mutex<World>,
     clients: Mutex<HashMap<u32, Client>>,
     mobs: Mutex<HashMap<u32, Mob>>,
+    drops: Mutex<HashMap<u32, Drop>>,
     next_id: AtomicU32,
     next_mob_id: AtomicU32,
+    next_drop_id: AtomicU32,
     started: std::time::Instant,
     start_frac: f64,
 }
@@ -81,8 +85,10 @@ async fn main() {
         world: Mutex::new(world),
         clients: Mutex::new(HashMap::new()),
         mobs: Mutex::new(HashMap::new()),
+        drops: Mutex::new(HashMap::new()),
         next_id: AtomicU32::new(1),
         next_mob_id: AtomicU32::new(1),
+        next_drop_id: AtomicU32::new(1),
         started: std::time::Instant::now(),
         start_frac,
     });
@@ -95,6 +101,7 @@ async fn main() {
         loop {
             tick.tick().await;
             tick_mobs(&mob_server, &mut rng);
+            tick_drops(&mob_server);
         }
     });
 
@@ -201,6 +208,42 @@ fn tick_mobs(server: &Server, rng: &mut mobs::Rng) {
     }
 }
 
+/// One 10 Hz drop tick: physics for drops still in motion, despawn expired
+/// ones. A drop that settled this tick is included in the batch once more so
+/// clients get its final resting position.
+fn tick_drops(server: &Server) {
+    const DT: f32 = 0.1;
+    let mut events: Vec<ServerMsg> = Vec::new();
+    {
+        let mut world = server.world.lock().unwrap();
+        let mut drop_map = server.drops.lock().unwrap();
+
+        drop_map.retain(|id, d| {
+            if d.expired() {
+                events.push(ServerMsg::DropGone { id: *id });
+                return false;
+            }
+            true
+        });
+
+        let mut moving = Vec::new();
+        for d in drop_map.values_mut() {
+            let was_moving = d.in_motion();
+            d.tick(&mut world, DT);
+            if was_moving {
+                moving.push((d.id, d.pos[0], d.pos[1], d.pos[2]));
+            }
+        }
+        if !moving.is_empty() {
+            events.push(ServerMsg::Drops { list: moving });
+        }
+    }
+
+    for e in &events {
+        server.broadcast(e, None);
+    }
+}
+
 fn damage_player(server: &Server, id: u32, dmg: i32) {
     let spawn = server.world.lock().unwrap().spawn_point();
     let (hp, died) = {
@@ -283,6 +326,16 @@ async fn handle_client(server: Arc<Server>, stream: TcpStream) -> Result<(), Err
     server.send_to(id, &ServerMsg::Welcome { id, spawn, players });
     server.send_to(id, &ServerMsg::Time { t: server.world_time() });
     server.send_to(id, &ServerMsg::Health { hp: FULL_HP });
+    let existing_drops: Vec<ServerMsg> = server
+        .drops
+        .lock()
+        .unwrap()
+        .values()
+        .map(|d| ServerMsg::DropSpawn { id: d.id, item: d.item, x: d.pos[0], y: d.pos[1], z: d.pos[2] })
+        .collect();
+    for m in &existing_drops {
+        server.send_to(id, m);
+    }
     server.broadcast(
         &ServerMsg::PlayerJoin {
             id,
@@ -335,9 +388,27 @@ fn handle_msg(server: &Server, id: u32, msg: ClientMsg) {
             if !allowed {
                 return;
             }
-            if server.world.lock().unwrap().set_block(x, y, z, bid) {
-                // Echoed to everyone, sender included: the server is authoritative.
-                server.broadcast(&ServerMsg::BlockUpdate { x, y, z, id: bid }, None);
+            let prev = {
+                let mut world = server.world.lock().unwrap();
+                let prev = world.block_at(x, y, z);
+                if prev == bid || !world.set_block(x, y, z, bid) {
+                    return;
+                }
+                prev
+            };
+            // Echoed to everyone, sender included: the server is authoritative.
+            server.broadcast(&ServerMsg::BlockUpdate { x, y, z, id: bid }, None);
+
+            // Breaking pops the block out as an item drop.
+            if bid == block::AIR {
+                if let Some(item) = drops::drop_for(prev) {
+                    let did = server.next_drop_id.fetch_add(1, Ordering::Relaxed);
+                    let mut rng = mobs::Rng(did.wrapping_mul(0x9e37_79b9) ^ 0x517c_c1b7);
+                    let d = Drop::new(did, item, x, y, z, rng.unit(), rng.unit());
+                    let msg = ServerMsg::DropSpawn { id: did, item, x: d.pos[0], y: d.pos[1], z: d.pos[2] };
+                    server.drops.lock().unwrap().insert(did, d);
+                    server.broadcast(&msg, None);
+                }
             }
         }
         ClientMsg::Attack { id: mob_id, tool } => {

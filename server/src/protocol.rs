@@ -72,6 +72,21 @@ pub enum ServerMsg {
     MobGone {
         id: u32,
     },
+    DropSpawn {
+        id: u32,
+        item: u8,
+        x: f32,
+        y: f32,
+        z: f32,
+    },
+    /// Position batch for drops still in motion; settled drops stop moving
+    /// and need no further updates.
+    Drops {
+        list: Vec<(u32, f32, f32, f32)>, // id, x, y, z
+    },
+    DropGone {
+        id: u32,
+    },
     Health {
         hp: i32,
     },
