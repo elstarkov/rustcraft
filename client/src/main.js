@@ -10,6 +10,7 @@ import { miningTime } from './items.js';
 import { Net } from './net.js';
 import { RemotePlayers } from './players.js';
 import { RemoteMobs } from './mobs.js';
+import { RemoteDrops } from './drops.js';
 
 const app = document.getElementById('app');
 const overlay = document.getElementById('overlay');
@@ -78,6 +79,7 @@ const hud = new HUD(atlasCanvas);
 const player = new Player(world, camera);
 const remotePlayers = new RemotePlayers(scene);
 const remoteMobs = new RemoteMobs(scene);
+const remoteDrops = new RemoteDrops(scene, atlas);
 const vignette = document.getElementById('vignette');
 let hp = 20;
 
@@ -220,6 +222,15 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
         break;
       case 'mob_gone':
         remoteMobs.remove(m.id);
+        break;
+      case 'drop_spawn':
+        remoteDrops.add(m.id, m.item, [m.x, m.y, m.z]);
+        break;
+      case 'drops':
+        remoteDrops.updateAll(m.list);
+        break;
+      case 'drop_gone':
+        remoteDrops.remove(m.id);
         break;
       case 'health':
         if (m.hp < hp) damageFlash();
@@ -462,6 +473,7 @@ function frame() {
   updateSky(dt);
   remotePlayers.update(dt);
   remoteMobs.update(dt);
+  remoteDrops.update(dt);
   chunkMeshes.process(4);
 
   fpsFrames++;
@@ -475,7 +487,7 @@ function frame() {
   hud.setDebug(
     `${fps} fps  xyz ${x.toFixed(1)} ${y.toFixed(1)} ${z.toFixed(1)}  ` +
       `chunk ${Math.floor(x / CHUNK_SIZE)},${Math.floor(z / CHUNK_SIZE)}  ` +
-      `players ${remotePlayers.players.size + 1}  mobs ${remoteMobs.mobs.size}`,
+      `players ${remotePlayers.players.size + 1}  mobs ${remoteMobs.mobs.size}  drops ${remoteDrops.drops.size}`,
   );
 
   renderer.render(scene, camera);
@@ -485,6 +497,6 @@ frame();
 
 // Debug handle for tooling and console poking.
 window.__rustcraft = {
-  world, player, chunkMeshes, remotePlayers, remoteMobs, hud, scene,
+  world, player, chunkMeshes, remotePlayers, remoteMobs, remoteDrops, hud, scene,
   crack: { box: crackBox, textures: crackTextures },
 };

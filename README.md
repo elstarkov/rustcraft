@@ -128,7 +128,9 @@ client needs no Rust toolchain; rebuild it with `npm run build:wasm` (needs
 shovel, axe, sword — scroll past the blocks to reach them). Breaking is timed:
 every block has a hardness (sand is half a second bare-handed, ores are
 several), the matching tool mines its block class 5× faster, and crack stages
-overlay the block while you hold the button. The sword mines nothing faster —
+overlay the block while you hold the button. A broken block pops out as a
+little spinning cube that falls, settles (or bobs in water), and despawns
+after five minutes. The sword mines nothing faster —
 it's for fighting. There is no crafting or inventory yet; every item is always
 available, and placing stays instant.
 
