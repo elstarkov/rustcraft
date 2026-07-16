@@ -30,12 +30,17 @@
         display: flex; gap: 4px; z-index: 5; pointer-events: none;
       }
       #hotbar .slot {
-        width: 44px; height: 44px; box-sizing: border-box;
+        width: 44px; height: 44px; box-sizing: border-box; position: relative;
         border: 2px solid rgba(255, 255, 255, 0.35); border-radius: 4px;
         background: rgba(0, 0, 0, 0.45); display: flex;
         align-items: center; justify-content: center;
       }
       #hotbar .slot.selected { border-color: #fff; background: rgba(0, 0, 0, 0.7); }
+      #hotbar .slot.empty canvas { opacity: 0.25; }
+      #hotbar .slot .count {
+        position: absolute; right: 3px; bottom: 1px; color: #fff;
+        font: bold 12px ui-monospace, Menlo, monospace; text-shadow: 1px 1px 0 #000;
+      }
       #hotbar canvas { width: 32px; height: 32px; image-rendering: pixelated; }
       #debug {
         position: fixed; left: 8px; top: 8px; color: #fff; z-index: 5;

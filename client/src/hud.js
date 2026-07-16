@@ -18,6 +18,8 @@ export class HUD {
       ...TOOLS.map((tool) => ({ tool, name: tool.kind })),
     ];
 
+    this.inventory = new Map(); // block id -> count, mirrors the server
+
     for (const item of this.items) {
       const slot = document.createElement('div');
       slot.className = 'slot';
@@ -31,6 +33,9 @@ export class HUD {
         const sx = (tile % ATLAS_TILES) * TILE;
         const sy = Math.floor(tile / ATLAS_TILES) * TILE;
         ctx.drawImage(atlasCanvas, sx, sy, TILE, TILE, 0, 0, TILE, TILE);
+        item.countEl = document.createElement('span');
+        item.countEl.className = 'count';
+        slot.appendChild(item.countEl);
       } else {
         drawToolIcon(ctx, item.tool.kind);
       }
@@ -38,7 +43,34 @@ export class HUD {
       this.hotbarEl.appendChild(slot);
       this.slots.push(slot);
     }
+    this.refreshCounts();
     this.select(0);
+  }
+
+  /// Server inventory snapshot: update slot counts, gray out empty ones.
+  setInventory(map) {
+    this.inventory = map;
+    this.refreshCounts();
+  }
+
+  stockOf(blockId) {
+    return this.inventory.get(blockId) ?? 0;
+  }
+
+  /// Optimistic local decrement on place; the server snapshot that follows
+  /// overwrites it either way.
+  consumeOne(blockId) {
+    this.inventory.set(blockId, Math.max(0, this.stockOf(blockId) - 1));
+    this.refreshCounts();
+  }
+
+  refreshCounts() {
+    this.items.forEach((item, i) => {
+      if (item.block == null) return; // tools are always available
+      const n = this.stockOf(item.block);
+      item.countEl.textContent = n > 0 ? n : '';
+      this.slots[i].classList.toggle('empty', n === 0);
+    });
   }
 
   select(i) {

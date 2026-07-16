@@ -33,8 +33,11 @@ export const BLOCKS = {
   [GOLD_ORE]: { name: 'gold ore', tiles: [13, 13, 13] },
 };
 
-// What the hotbar offers, in slot order.
-export const PLACEABLE = [GRASS, DIRT, STONE, SAND, LOG, LEAVES, PLANKS, GLASS];
+// What the hotbar offers, in slot order. Ores are placeable so mined ore
+// isn't a dead item (no crafting yet).
+export const PLACEABLE = [
+  GRASS, DIRT, STONE, SAND, LOG, LEAVES, PLANKS, GLASS, COAL_ORE, IRON_ORE, GOLD_ORE,
+];
 
 // Blocks the player collides with.
 export function isSolid(id) {

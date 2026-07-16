@@ -241,6 +241,9 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
         player.pos.set(m.spawn[0], m.spawn[1], m.spawn[2]);
         player.vel.set(0, 0, 0);
         break;
+      case 'inventory':
+        hud.setInventory(new Map(m.items));
+        break;
     }
   },
   onChunk(cx, cz, blocks) {
@@ -339,6 +342,7 @@ document.addEventListener('mousedown', (e) => {
   if (e.button !== 2) return;
   const block = hud.selectedBlock;
   if (block == null) return; // a tool is in hand
+  if (hud.stockOf(block) <= 0) return; // nothing left to place
   const hit = player.raycast();
   if (!hit) return;
   const [px, py, pz] = [hit.x + hit.face[0], hit.y + hit.face[1], hit.z + hit.face[2]];
@@ -346,6 +350,7 @@ document.addEventListener('mousedown', (e) => {
   if ((current === AIR || current === WATER) && !player.blockIntersectsPlayer(px, py, pz)) {
     applyEdit(px, py, pz, block);
     net.setBlock(px, py, pz, block);
+    hud.consumeOne(block);
   }
 });
 document.addEventListener('mouseup', (e) => {

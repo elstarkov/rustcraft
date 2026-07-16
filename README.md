@@ -124,15 +124,19 @@ fallback if instantiation fails. The `.wasm` is checked in, so running the
 client needs no Rust toolchain; rebuild it with `npm run build:wasm` (needs
 `rustup target add wasm32-unknown-unknown`).
 
-**Items & mining** — the hotbar holds eight blocks plus four tools (pickaxe,
-shovel, axe, sword — scroll past the blocks to reach them). Breaking is timed:
-every block has a hardness (sand is half a second bare-handed, ores are
-several), the matching tool mines its block class 5× faster, and crack stages
-overlay the block while you hold the button. A broken block pops out as a
-little spinning cube that falls, settles (or bobs in water), and despawns
-after five minutes. The sword mines nothing faster —
-it's for fighting. There is no crafting or inventory yet; every item is always
-available, and placing stays instant.
+**Items & mining** — the hotbar holds eleven blocks (the three ores included)
+plus four tools (pickaxe, shovel, axe, sword — scroll past the blocks to
+reach them). Breaking is timed: every block has a hardness (sand is half a
+second bare-handed, ores are several), the matching tool mines its block
+class 5× faster, and crack stages overlay the block while you hold the
+button. A broken block pops out as a little spinning cube that falls, settles
+(or bobs in water), and despawns after five minutes — walk over it to collect
+it. The inventory is server-authoritative: counts show on the hotbar slots,
+placing consumes stock, and a placement without stock is reverted by the
+server. Every block drops itself, so anything you can see you can collect;
+new players start with a stack of planks and some glass, which have no
+natural source until crafting exists. The sword mines nothing faster — it's
+for fighting. Tools are free and indestructible for now.
 
 **Monsters** — zombies spawn on the surface near players at night (the server
 clock decides) and despawn at dawn, when everyone leaves, or after idling too
@@ -164,5 +168,6 @@ Amanatides & Woo voxel raycast, so picking is exact rather than mesh-based.
 - [x] Rust → wasm meshing module (~5× the JS mesher, JS fallback kept)
 - [x] Tools and timed mining with crack stages
 - [x] Zombies at night, player health and respawn
-- [ ] Item drops, inventory and crafting
+- [x] Item drops and a server-authoritative inventory
+- [ ] Crafting
 - [ ] More mob types
