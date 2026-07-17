@@ -550,6 +550,15 @@ fn handle_msg(server: &Server, id: u32, msg: ClientMsg) {
             };
             server.send_to(id, &snapshot);
         }
+        ClientMsg::Fall { blocks } => {
+            // A heart per block beyond three; ~23 blocks is lethal from
+            // full health. The clamp keeps a hostile client from claiming
+            // more than the world's height.
+            let dmg = (blocks.min(64.0) - 3.0).floor() as i32;
+            if dmg > 0 {
+                damage_player(server, id, dmg);
+            }
+        }
         ClientMsg::Pos { x, y, z, yaw, pitch } => {
             if let Some(c) = server.clients.lock().unwrap().get_mut(&id) {
                 c.pos = [x, y, z];

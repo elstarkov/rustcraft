@@ -97,6 +97,12 @@ let groanTimer = 2;
 const vignette = document.getElementById('vignette');
 let hp = 20;
 
+// Landings: always a thump, and past three blocks the server takes hearts.
+player.onLand = (fall) => {
+  sound.thump(fall);
+  if (fall > 3.5) net.fall(fall);
+};
+
 function damageFlash() {
   vignette.style.transition = 'none';
   vignette.style.opacity = '1';
@@ -204,6 +210,7 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
       case 'welcome':
         player.pos.set(m.spawn[0], m.spawn[1], m.spawn[2]);
         player.vel.set(0, 0, 0);
+        player.peakY = player.pos.y;
         viewModel.setPalette(m.id);
         for (const p of m.players) remotePlayers.add(p.id, p.name, p.pos);
         spawned = true;
@@ -262,6 +269,7 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
       case 'respawn':
         player.pos.set(m.spawn[0], m.spawn[1], m.spawn[2]);
         player.vel.set(0, 0, 0);
+        player.peakY = player.pos.y; // a teleport is not a fall
         break;
       case 'inventory': {
         hud.setInventory(new Map(m.items));
@@ -595,4 +603,5 @@ frame();
 window.__rustcraft = {
   world, player, chunkMeshes, remotePlayers, remoteMobs, remoteDrops, hud, scene, viewModel,
   craftPanel, sound, crack: { box: crackBox, textures: crackTextures },
+  get hp() { return hp; },
 };

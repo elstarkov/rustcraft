@@ -12,6 +12,9 @@ pub enum ClientMsg {
     Attack { id: u32, tool: Option<String> },
     /// Craft one batch of a recipe, by index into craft::RECIPES.
     Craft { recipe: usize },
+    /// The client landed after falling `blocks` — it owns its physics, so
+    /// the server just converts height to damage (clamped).
+    Fall { blocks: f32 },
 }
 
 #[derive(Serialize, Clone)]

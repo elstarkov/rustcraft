@@ -20,6 +20,8 @@ export class Player {
     this.pitch = 0;
     this.onGround = false;
     this.keys = new Set();
+    this.peakY = this.pos.y; // highest point since last on solid ground
+    this.onLand = null; // called with the fall height in blocks
 
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
@@ -89,10 +91,30 @@ export class Player {
     this.moveAxis('y', this.vel.y * dt);
     this.moveAxis('z', this.vel.z * dt);
 
+    // Fall tracking: remember the highest point since we last stood on
+    // something, and report the drop when we land. Water breaks a fall —
+    // swimming, or landing with the feet in a water block.
+    const feetInWater = this.world.getBlock(
+      Math.floor(this.pos.x),
+      Math.floor(this.pos.y + 0.1),
+      Math.floor(this.pos.z),
+    ) === WATER;
+    if (swimming || feetInWater) {
+      this.peakY = this.pos.y;
+    } else {
+      this.peakY = Math.max(this.peakY, this.pos.y);
+      if (this.onGround) {
+        const fall = this.peakY - this.pos.y;
+        this.peakY = this.pos.y;
+        if (fall > 1.5 && this.onLand) this.onLand(fall);
+      }
+    }
+
     // Don't fall out of the world forever.
     if (this.pos.y < -20) {
       this.pos.set(this.pos.x, 80, this.pos.z);
       this.vel.set(0, 0, 0);
+      this.peakY = this.pos.y;
     }
 
     this.camera.position.copy(this.eye());

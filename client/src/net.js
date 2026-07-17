@@ -54,6 +54,10 @@ export class Net {
     this.send({ type: 'craft', recipe });
   }
 
+  fall(blocks) {
+    this.send({ type: 'fall', blocks });
+  }
+
   sendPos(pos, yaw, pitch) {
     this.send({ type: 'pos', x: pos.x, y: pos.y, z: pos.z, yaw, pitch });
   }

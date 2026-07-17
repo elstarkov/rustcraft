@@ -170,6 +170,10 @@ follows the sender's pitch, and yaw turns the short way around the circle.
 **Physics** — the player is a 0.6×1.8 AABB integrated per axis against the
 voxel grid (gravity, jumping, swimming). Block targeting uses an
 Amanatides & Woo voxel raycast, so picking is exact rather than mesh-based.
+Falls hurt: the client tracks its peak height and reports the drop on
+landing, the server converts blocks beyond three into damage (clamped, and
+routed through the usual death/respawn path) — landing in water is free,
+which makes lakes the fast way down a mountain.
 
 ## Roadmap
 
@@ -185,4 +189,5 @@ Amanatides & Woo voxel raycast, so picking is exact rather than mesh-based.
 - [x] First-person hand with the held block or tool
 - [x] Crafting (logs → planks, sand → glass)
 - [x] Synthesized sound effects (Web Audio, no asset files)
+- [x] Fall damage (water breaks a fall)
 - [ ] More mob types
