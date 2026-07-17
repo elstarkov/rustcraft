@@ -8,8 +8,12 @@
 // vertex attribute picks the atlas tile (see makeMaterials in mesher.js).
 
 import {
-  AIR, BLOCKS, CHUNK_SIZE, WORLD_HEIGHT, isSeeThrough,
+  AIR, BLOCKS, CHUNK_SIZE, TORCH, WORLD_HEIGHT, isSeeThrough,
 } from './blocks.js';
+
+// Torches aren't cubes: the mesher emits nothing for them (torches.js
+// renders a model per torch) and neighbors treat them like air.
+const skip = (b) => b === AIR || b === TORCH;
 
 const SHADE = { nx: 0.8, px: 0.8, ny: 0.55, py: 1.0, nz: 0.7, pz: 0.7 };
 
@@ -120,7 +124,7 @@ export function meshChunkData(cx, cz, blocks, borders) {
       for (let y = 0; y < H; y++) {
         for (let z = 0; z < S; z++) {
           const b = get(x, y, z);
-          const visible = b !== AIR && faceVisible(b, get(x + sign, y, z));
+          const visible = !skip(b) && faceVisible(b, get(x + sign, y, z));
           mask[y * S + z] = visible ? (any = keyFor(b, 0, sign)) : 0;
         }
       }
@@ -145,7 +149,7 @@ export function meshChunkData(cx, cz, blocks, borders) {
       for (let y = 0; y < H; y++) {
         for (let x = 0; x < S; x++) {
           const b = get(x, y, z);
-          const visible = b !== AIR && faceVisible(b, get(x, y, z + sign));
+          const visible = !skip(b) && faceVisible(b, get(x, y, z + sign));
           mask[y * S + x] = visible ? (any = keyFor(b, 2, sign)) : 0;
         }
       }
@@ -170,7 +174,7 @@ export function meshChunkData(cx, cz, blocks, borders) {
       for (let z = 0; z < S; z++) {
         for (let x = 0; x < S; x++) {
           const b = get(x, y, z);
-          const visible = b !== AIR && faceVisible(b, get(x, y + sign, z));
+          const visible = !skip(b) && faceVisible(b, get(x, y + sign, z));
           mask[z * S + x] = visible ? (any = keyFor(b, 1, sign)) : 0;
         }
       }

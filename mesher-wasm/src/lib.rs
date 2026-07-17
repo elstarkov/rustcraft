@@ -17,9 +17,10 @@ const H: usize = 64;
 const VOLUME: usize = S * S * H;
 const BORDER: usize = S * H; // one neighbor column slice, indexed [y * S + i]
 const AIR: u8 = 0;
+const TORCH: u8 = 13;
 
 /// [top, bottom, side] atlas tiles per block id — must match client blocks.js.
-const TILES: [[u32; 3]; 13] = [
+const TILES: [[u32; 3]; 14] = [
     [0, 0, 0],    // air (unused)
     [0, 1, 2],    // grass
     [1, 1, 1],    // dirt
@@ -33,10 +34,17 @@ const TILES: [[u32; 3]; 13] = [
     [11, 11, 11], // coal ore
     [12, 12, 12], // iron ore
     [13, 13, 13], // gold ore
+    [8, 8, 8],    // torch (never emitted — see skip())
 ];
-const SEE_THROUGH: [bool; 13] = [
-    true, false, false, false, false, false, false, false, true, true, false, false, false,
+const SEE_THROUGH: [bool; 14] = [
+    true, false, false, false, false, false, false, false, true, true, false, false, false, true,
 ];
+
+/// Torches aren't cubes: emit nothing for them (the client renders a model
+/// per torch) and let neighbors treat them like air.
+fn skip(b: u8) -> bool {
+    b == AIR || b == TORCH
+}
 
 #[derive(Default)]
 struct Sink {
@@ -212,7 +220,7 @@ pub extern "C" fn mesh(cx: i32, cz: i32, border_flags: u32) {
             for y in 0..H {
                 for z in 0..S {
                     let b = get(input, flags, x, y as i32, z as i32);
-                    let visible = b != AIR && face_visible(b, get(input, flags, x + sign, y as i32, z as i32));
+                    let visible = !skip(b) && face_visible(b, get(input, flags, x + sign, y as i32, z as i32));
                     mask[y * S + z] = if visible {
                         any = true;
                         key_for(b, 0, sign)
@@ -247,7 +255,7 @@ pub extern "C" fn mesh(cx: i32, cz: i32, border_flags: u32) {
             for y in 0..H {
                 for x in 0..S {
                     let b = get(input, flags, x as i32, y as i32, z);
-                    let visible = b != AIR && face_visible(b, get(input, flags, x as i32, y as i32, z + sign));
+                    let visible = !skip(b) && face_visible(b, get(input, flags, x as i32, y as i32, z + sign));
                     mask[y * S + x] = if visible {
                         any = true;
                         key_for(b, 2, sign)
@@ -282,7 +290,7 @@ pub extern "C" fn mesh(cx: i32, cz: i32, border_flags: u32) {
             for z in 0..S {
                 for x in 0..S {
                     let b = get(input, flags, x as i32, y, z as i32);
-                    let visible = b != AIR && face_visible(b, get(input, flags, x as i32, y + sign, z as i32));
+                    let visible = !skip(b) && face_visible(b, get(input, flags, x as i32, y + sign, z as i32));
                     mask[z * S + x] = if visible {
                         any = true;
                         key_for(b, 1, sign)

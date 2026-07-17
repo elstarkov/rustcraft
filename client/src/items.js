@@ -3,7 +3,7 @@
 // There is no inventory or crafting (yet) — every tool is always available.
 
 import {
-  COAL_ORE, DIRT, GLASS, GOLD_ORE, GRASS, IRON_ORE, LEAVES, LOG, PLANKS, SAND, STONE,
+  COAL_ORE, DIRT, GLASS, GOLD_ORE, GRASS, IRON_ORE, LEAVES, LOG, PLANKS, SAND, STONE, TORCH,
 } from './blocks.js';
 
 /// Seconds to break a block bare-handed (or with the wrong tool).
@@ -19,6 +19,7 @@ export const HARDNESS = {
   [PLANKS]: 1.6,
   [LEAVES]: 0.3,
   [GLASS]: 0.4,
+  [TORCH]: 0.1,
 };
 
 // kind doubles as the wire code sent with attack messages.
@@ -89,4 +90,18 @@ const ICONS = {
 
 export function drawToolIcon(ctx, kind) {
   ICONS[kind]?.(ctx);
+}
+
+/// Torch hotbar icon: a stick with a glowing head. The torch has no atlas
+/// tile (the mesher never draws it), so its icon is pixel art like the tools.
+export function drawTorchIcon(ctx) {
+  ctx.fillStyle = HANDLE;
+  ctx.fillRect(7, 5, 2, 9);
+  ctx.fillStyle = HANDLE_DARK;
+  ctx.fillRect(8, 6, 1, 8);
+  ctx.fillStyle = '#ffd23e';
+  ctx.fillRect(6, 2, 4, 4);
+  ctx.fillStyle = '#ff9d2e';
+  plot(ctx, [[6, 2], [9, 2], [6, 5], [9, 5]], '#ff9d2e');
+  plot(ctx, [[7, 1], [8, 1]], '#fff1a8');
 }

@@ -1,6 +1,6 @@
-import { BLOCKS, PLACEABLE } from './blocks.js';
+import { BLOCKS, PLACEABLE, TORCH } from './blocks.js';
 import { ATLAS_TILES, TILE } from './textures.js';
-import { TOOLS, drawToolIcon } from './items.js';
+import { TOOLS, drawToolIcon, drawTorchIcon } from './items.js';
 
 export class HUD {
   constructor(atlasCanvas) {
@@ -28,7 +28,12 @@ export class HUD {
       thumb.width = TILE;
       thumb.height = TILE;
       const ctx = thumb.getContext('2d');
-      if (item.block != null) {
+      if (item.block === TORCH) {
+        drawTorchIcon(ctx);
+        item.countEl = document.createElement('span');
+        item.countEl.className = 'count';
+        slot.appendChild(item.countEl);
+      } else if (item.block != null) {
         const tile = BLOCKS[item.block].tiles[2]; // side texture reads best
         const sx = (tile % ATLAS_TILES) * TILE;
         const sy = Math.floor(tile / ATLAS_TILES) * TILE;

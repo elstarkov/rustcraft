@@ -16,6 +16,7 @@ export const WATER = 9;
 export const COAL_ORE = 10;
 export const IRON_ORE = 11;
 export const GOLD_ORE = 12;
+export const TORCH = 13;
 
 // Atlas tile index per face: [top, bottom, side]
 export const BLOCKS = {
@@ -31,17 +32,20 @@ export const BLOCKS = {
   [COAL_ORE]: { name: 'coal ore', tiles: [11, 11, 11] },
   [IRON_ORE]: { name: 'iron ore', tiles: [12, 12, 12] },
   [GOLD_ORE]: { name: 'gold ore', tiles: [13, 13, 13] },
+  // Not a cube: the mesher skips torch cells entirely and the client
+  // renders a little model instead (see torches.js). Tiles are unused.
+  [TORCH]: { name: 'torch', tiles: [8, 8, 8], seeThrough: true },
 };
 
 // What the hotbar offers, in slot order. Ores are placeable so mined ore
 // isn't a dead item (no crafting yet).
 export const PLACEABLE = [
-  GRASS, DIRT, STONE, SAND, LOG, LEAVES, PLANKS, GLASS, COAL_ORE, IRON_ORE, GOLD_ORE,
+  GRASS, DIRT, STONE, SAND, LOG, LEAVES, PLANKS, GLASS, COAL_ORE, IRON_ORE, GOLD_ORE, TORCH,
 ];
 
 // Blocks the player collides with.
 export function isSolid(id) {
-  return id !== AIR && id !== WATER;
+  return id !== AIR && id !== WATER && id !== TORCH;
 }
 
 // Blocks that don't fully hide the face of a neighboring block.
