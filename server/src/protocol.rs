@@ -108,6 +108,8 @@ pub enum ServerMsg {
     },
     Respawn {
         spawn: [f32; 3],
+        /// What killed the player: "zombie", "fall".
+        cause: String,
     },
 }
 

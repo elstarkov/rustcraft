@@ -217,7 +217,7 @@ fn tick_mobs(server: &Server, rng: &mut mobs::Rng) {
         server.broadcast(e, None);
     }
     for pid in hits {
-        damage_player(server, pid, mobs::ZOMBIE_DAMAGE);
+        damage_player(server, pid, mobs::ZOMBIE_DAMAGE, "zombie");
     }
 }
 
@@ -292,9 +292,9 @@ fn tick_drops(server: &Server) {
     }
 }
 
-fn damage_player(server: &Server, id: u32, dmg: i32) {
+fn damage_player(server: &Server, id: u32, dmg: i32, cause: &str) {
     let spawn = server.world.lock().unwrap().spawn_point();
-    let (hp, died) = {
+    let (hp, died, name) = {
         let mut clients = server.clients.lock().unwrap();
         let Some(c) = clients.get_mut(&id) else { return };
         c.hp -= dmg;
@@ -303,14 +303,23 @@ fn damage_player(server: &Server, id: u32, dmg: i32) {
             c.hp = FULL_HP;
             c.pos = spawn;
         }
-        (c.hp, died)
+        (c.hp, died, c.name.clone())
     };
     if died {
-        server.send_to(id, &ServerMsg::Respawn { spawn });
+        server.send_to(id, &ServerMsg::Respawn { spawn, cause: cause.into() });
         // Everyone else sees the body snap back to spawn.
         server.broadcast(
             &ServerMsg::PlayerPos { id, x: spawn[0], y: spawn[1], z: spawn[2], yaw: 0.0, pitch: 0.0 },
             Some(id),
+        );
+        let phrase = match cause {
+            "zombie" => "was slain by a zombie",
+            "fall" => "fell from a high place",
+            _ => "died",
+        };
+        server.broadcast(
+            &ServerMsg::Chat { name: String::new(), text: format!("{name} {phrase}") },
+            None,
         );
     }
     server.send_to(id, &ServerMsg::Health { hp });
@@ -556,7 +565,7 @@ fn handle_msg(server: &Server, id: u32, msg: ClientMsg) {
             // more than the world's height.
             let dmg = (blocks.min(64.0) - 3.0).floor() as i32;
             if dmg > 0 {
-                damage_player(server, id, dmg);
+                damage_player(server, id, dmg, "fall");
             }
         }
         ClientMsg::Chat { text } => {

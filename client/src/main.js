@@ -97,7 +97,12 @@ let invTotal = 0; // to tell pickups (gain) from placements (loss)
 let stepAcc = 0;
 let groanTimer = 2;
 const vignette = document.getElementById('vignette');
+const deathEl = document.getElementById('death');
+const deathCauseEl = document.getElementById('death-cause');
+let deathShownAt = 0;
 let hp = 20;
+
+const DEATH_PHRASES = { zombie: 'slain by a zombie', fall: 'you fell from a high place' };
 
 // Landings: always a thump, and past three blocks the server takes hearts.
 player.onLand = (fall) => {
@@ -276,6 +281,12 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
         player.pos.set(m.spawn[0], m.spawn[1], m.spawn[2]);
         player.vel.set(0, 0, 0);
         player.peakY = player.pos.y; // a teleport is not a fall
+        deathCauseEl.textContent = DEATH_PHRASES[m.cause] ?? '';
+        deathEl.classList.remove('hidden');
+        deathShownAt = performance.now();
+        craftPanel.hide();
+        chat.closeInput();
+        miningDown = false;
         break;
       case 'chat':
         chat.add(m.name, m.text);
@@ -391,6 +402,12 @@ let miningDown = false;
 
 document.addEventListener('mousedown', (e) => {
   sound.unlock();
+  // The death screen eats every click; a short delay so mid-combat
+  // clicking doesn't dismiss it before it's even been seen.
+  if (!deathEl.classList.contains('hidden')) {
+    if (performance.now() - deathShownAt > 800) deathEl.classList.add('hidden');
+    return;
+  }
   if (document.pointerLockElement !== renderer.domElement || !spawned) return;
   if (e.button === 0) {
     viewModel.swing();

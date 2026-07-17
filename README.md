@@ -152,8 +152,10 @@ long — usually that means one fell into a cave mid-chase. AI runs server-side
 at 10 Hz with the same AABB voxel physics as players: they wander, chase
 anyone within 3D range, hop single blocks (the jump speed is tuned for the
 coarse tick), float across ponds, and swing for 3 damage in melee range.
-Players carry 20 hp rendered as hearts, flash red when hit, and respawn at
-world spawn on death. Swinging back deals 6 with the sword, 3 with other
+Players carry 20 hp rendered as hearts and flash red when hit. Death shows a
+proper death screen naming the cause ("slain by a zombie", "you fell from a
+high place"), announces it in chat for everyone, and a click respawns you at
+world spawn with full hearts. Swinging back deals 6 with the sword, 3 with other
 tools, 2 bare-handed, with knockback — a zombie dies after 12.
 
 **Sound** — every effect is synthesized by the Web Audio API the moment it
@@ -193,4 +195,6 @@ which makes lakes the fast way down a mountain.
 - [x] Crafting (logs → planks, sand → glass)
 - [x] Synthesized sound effects (Web Audio, no asset files)
 - [x] Fall damage (water breaks a fall)
+- [x] Chat with join, leave and death announcements
+- [x] Death screen naming the cause
 - [ ] More mob types
