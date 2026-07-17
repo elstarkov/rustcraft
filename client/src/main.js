@@ -14,6 +14,7 @@ import { RemoteDrops } from './drops.js';
 import { ViewModel } from './viewmodel.js';
 import { CraftingPanel } from './craft.js';
 import { Sound } from './sound.js';
+import { Chat } from './chat.js';
 
 const app = document.getElementById('app');
 const overlay = document.getElementById('overlay');
@@ -90,6 +91,7 @@ const craftPanel = new CraftingPanel(atlasCanvas, (i) => {
   net.craft(i);
 });
 const sound = new Sound();
+const chat = new Chat((text) => net.chat(text));
 let hudSelected = -1; // forces the initial viewModel.setItem
 let invTotal = 0; // to tell pickups (gain) from placements (loss)
 let stepAcc = 0;
@@ -216,14 +218,18 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
         spawned = true;
         overlayMsg.innerHTML =
           'click to play<br><br>WASD move · SPACE jump/swim · mouse look<br>' +
-          'hold left click mine · right click place · 1-8 / wheel select item · E craft';
+          'hold left click mine · right click place · 1-8 / wheel select item · E craft · T chat';
         break;
       case 'player_join':
         remotePlayers.add(m.id, m.name, m.pos);
+        chat.add('', `${m.name} joined`);
         break;
-      case 'player_leave':
+      case 'player_leave': {
+        const name = remotePlayers.players.get(m.id)?.name;
         remotePlayers.remove(m.id);
+        if (name) chat.add('', `${name} left`);
         break;
+      }
       case 'player_pos':
         remotePlayers.updatePos(m.id, m.x, m.y, m.z, m.yaw, m.pitch);
         break;
@@ -270,6 +276,9 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
         player.pos.set(m.spawn[0], m.spawn[1], m.spawn[2]);
         player.vel.set(0, 0, 0);
         player.peakY = player.pos.y; // a teleport is not a fall
+        break;
+      case 'chat':
+        chat.add(m.name, m.text);
         break;
       case 'inventory': {
         hud.setInventory(new Map(m.items));
@@ -358,6 +367,7 @@ document.addEventListener('pointerlockchange', () => {
     craftPanel.hide();
   } else {
     miningDown = false;
+    chat.closeInput();
   }
 });
 
@@ -417,9 +427,20 @@ document.addEventListener('mouseup', (e) => {
 });
 
 window.addEventListener('keydown', (e) => {
+  if (e.target instanceof HTMLInputElement) return; // typing in chat
   const n = parseInt(e.key, 10);
   if (n >= 1 && n <= 8) hud.select(n - 1);
   if (e.code === 'KeyE' && spawned) toggleCrafting();
+  if (
+    (e.code === 'KeyT' || e.code === 'Enter') &&
+    spawned &&
+    document.pointerLockElement === renderer.domElement &&
+    !chat.inputOpen
+  ) {
+    e.preventDefault(); // keep the "t" out of the input
+    player.keys.clear(); // held movement keys would never get their keyup
+    chat.openInput();
+  }
 });
 window.addEventListener('wheel', (e) => hud.select(hud.selected + Math.sign(e.deltaY)));
 
@@ -602,6 +623,6 @@ frame();
 // Debug handle for tooling and console poking.
 window.__rustcraft = {
   world, player, chunkMeshes, remotePlayers, remoteMobs, remoteDrops, hud, scene, viewModel,
-  craftPanel, sound, crack: { box: crackBox, textures: crackTextures },
+  craftPanel, sound, chat, net, crack: { box: crackBox, textures: crackTextures },
   get hp() { return hp; },
 };

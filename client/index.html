@@ -53,6 +53,27 @@
         text-shadow: 0 0 3px #000; pointer-events: none; user-select: none;
       }
       #hearts .lost { color: rgba(255, 255, 255, 0.25); }
+      #chat {
+        position: fixed; left: 10px; bottom: 92px; z-index: 6; width: 400px;
+        max-height: 40vh; overflow: hidden; display: flex; flex-direction: column;
+        justify-content: flex-end; font: 13px ui-monospace, Menlo, monospace;
+        color: #fff; pointer-events: none;
+      }
+      #chat div {
+        background: rgba(0, 0, 0, 0.45); padding: 2px 8px; margin-top: 2px;
+        border-radius: 3px; overflow-wrap: break-word; transition: opacity 1s;
+      }
+      #chat div.old { opacity: 0; }
+      #chat.chatting div.old { opacity: 1; }
+      #chat .who { color: #ffd66e; }
+      #chat .system { color: #b9c0ff; font-style: italic; }
+      #chat-input {
+        position: fixed; left: 10px; bottom: 60px; z-index: 6; width: 400px;
+        box-sizing: border-box; background: rgba(0, 0, 0, 0.65);
+        border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 3px;
+        color: #fff; font: 13px ui-monospace, Menlo, monospace;
+        padding: 6px 8px; outline: none;
+      }
       #crafting {
         position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
         background: rgba(0, 0, 0, 0.78); border: 2px solid rgba(255, 255, 255, 0.35);
@@ -84,6 +105,8 @@
     <div id="hotbar" class="hidden"></div>
     <div id="hearts" class="hidden"></div>
     <div id="crafting" class="hidden"></div>
+    <div id="chat"></div>
+    <input id="chat-input" class="hidden" maxlength="200" autocomplete="off" spellcheck="false" />
     <div id="vignette"></div>
     <div id="debug" class="hidden"></div>
     <div id="overlay" class="overlay">

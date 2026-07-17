@@ -15,6 +15,7 @@ pub enum ClientMsg {
     /// The client landed after falling `blocks` — it owns its physics, so
     /// the server just converts height to damage (clamped).
     Fall { blocks: f32 },
+    Chat { text: String },
 }
 
 #[derive(Serialize, Clone)]
@@ -96,6 +97,11 @@ pub enum ServerMsg {
     /// changes. Only non-zero counts are listed.
     Inventory {
         items: Vec<(u8, u32)>, // block id, count
+    },
+    /// A chat line. An empty name marks a system announcement.
+    Chat {
+        name: String,
+        text: String,
     },
     Health {
         hp: i32,

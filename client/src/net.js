@@ -58,6 +58,10 @@ export class Net {
     this.send({ type: 'fall', blocks });
   }
 
+  chat(text) {
+    this.send({ type: 'chat', text });
+  }
+
   sendPos(pos, yaw, pitch) {
     this.send({ type: 'pos', x: pos.x, y: pos.y, z: pos.z, yaw, pitch });
   }

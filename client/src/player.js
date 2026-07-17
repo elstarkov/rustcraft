@@ -25,6 +25,7 @@ export class Player {
 
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
+      if (e.target instanceof HTMLInputElement) return; // typing in chat
       this.keys.add(e.code);
     });
     window.addEventListener('keyup', (e) => this.keys.delete(e.code));

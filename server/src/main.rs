@@ -559,6 +559,17 @@ fn handle_msg(server: &Server, id: u32, msg: ClientMsg) {
                 damage_player(server, id, dmg);
             }
         }
+        ClientMsg::Chat { text } => {
+            let text: String = text.trim().chars().take(200).collect();
+            if text.is_empty() {
+                return;
+            }
+            let Some(name) = server.clients.lock().unwrap().get(&id).map(|c| c.name.clone())
+            else {
+                return;
+            };
+            server.broadcast(&ServerMsg::Chat { name, text }, None);
+        }
         ClientMsg::Pos { x, y, z, yaw, pitch } => {
             if let Some(c) = server.clients.lock().unwrap().get_mut(&id) {
                 c.pos = [x, y, z];

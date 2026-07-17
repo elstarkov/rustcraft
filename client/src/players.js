@@ -98,6 +98,7 @@ export class RemotePlayers {
     this.scene.add(avatar.group);
     this.players.set(id, {
       ...avatar,
+      name,
       target: new THREE.Vector3(...pos),
       yaw: 0,
       pitch: 0,

@@ -79,6 +79,7 @@ cache.
 | right click | place block |
 | 1–8 / wheel | select block or tool |
 | E | open / close crafting |
+| T / Enter | chat |
 
 ## How it works
 
@@ -95,7 +96,7 @@ restarts — untouched terrain keeps regenerating from the seed and costs no
 disk at all.
 
 **Protocol** — JSON text frames for control messages (`hello`, `chunk_req`,
-`set_block`, `pos`, `craft` → `welcome`, `block_update`, `player_join/pos/leave`,
+`set_block`, `pos`, `craft`, `chat` → `welcome`, `block_update`, `player_join/pos/leave`,
 `time`, `drop_spawn/drops/drop_gone`, `inventory`) and binary frames for chunk payloads:
 `[kind u8][cx i32][cz i32][16384 block bytes]`.
 
@@ -166,6 +167,8 @@ deterministic per-id skins: shirt and pants colors from a golden-angle hue
 walk, one of four skin tones, hair, and an 8×8 pixel face. The walk cycle is
 paced by how fast the avatar actually moves between network updates, the head
 follows the sender's pitch, and yaw turns the short way around the circle.
+A chat box sits bottom-left — T or Enter to type, message lines fade after a
+few seconds (typing reveals the history), and joins and leaves are announced.
 
 **Physics** — the player is a 0.6×1.8 AABB integrated per axis against the
 voxel grid (gravity, jumping, swimming). Block targeting uses an
