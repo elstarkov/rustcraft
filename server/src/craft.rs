@@ -12,4 +12,5 @@ pub struct Recipe {
 pub const RECIPES: &[Recipe] = &[
     Recipe { inputs: &[(block::LOG, 1)], output: (block::PLANKS, 4) },
     Recipe { inputs: &[(block::SAND, 1)], output: (block::GLASS, 1) },
+    Recipe { inputs: &[(block::COAL_ORE, 1), (block::PLANKS, 1)], output: (block::TORCH, 4) },
 ];

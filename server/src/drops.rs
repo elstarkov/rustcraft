@@ -98,5 +98,5 @@ impl Drop {
 
 fn solid_at(world: &mut World, x: f32, y: f32, z: f32) -> bool {
     let id = world.block_at(x.floor() as i32, y.floor() as i32, z.floor() as i32);
-    id != block::AIR && id != block::WATER
+    id != block::AIR && id != block::WATER && id != block::TORCH
 }

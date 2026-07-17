@@ -54,7 +54,7 @@ impl Rng {
 }
 
 fn solid(id: u8) -> bool {
-    id != block::AIR && id != block::WATER
+    id != block::AIR && id != block::WATER && id != block::TORCH
 }
 
 impl Mob {

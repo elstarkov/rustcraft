@@ -23,6 +23,8 @@ pub mod block {
     pub const COAL_ORE: u8 = 10;
     pub const IRON_ORE: u8 = 11;
     pub const GOLD_ORE: u8 = 12;
+    /// Non-solid light source; crafted, never generated.
+    pub const TORCH: u8 = 13;
 
     /// Blocks a client is allowed to place. Water flows only from world gen.
     /// Ores are placeable so mined ore isn't a dead item (no crafting yet).
@@ -30,7 +32,7 @@ pub mod block {
         matches!(
             id,
             GRASS | DIRT | STONE | SAND | LOG | LEAVES | PLANKS | GLASS
-                | COAL_ORE | IRON_ORE | GOLD_ORE
+                | COAL_ORE | IRON_ORE | GOLD_ORE | TORCH
         )
     }
 }
@@ -315,11 +317,11 @@ impl World {
         )
     }
 
-    /// Highest solid (non-air, non-water) block in a column, if any.
+    /// Highest solid (non-air, non-water, non-torch) block in a column.
     pub fn surface_y(&mut self, x: i32, z: i32) -> Option<i32> {
         (0..WORLD_HEIGHT as i32).rev().find(|&y| {
             let id = self.block_at(x, y, z);
-            id != block::AIR && id != block::WATER
+            id != block::AIR && id != block::WATER && id != block::TORCH
         })
     }
 
