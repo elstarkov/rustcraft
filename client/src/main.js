@@ -13,6 +13,7 @@ import { RemoteMobs } from './mobs.js';
 import { RemoteDrops } from './drops.js';
 import { ViewModel } from './viewmodel.js';
 import { CraftingPanel } from './craft.js';
+import { Sound } from './sound.js';
 
 const app = document.getElementById('app');
 const overlay = document.getElementById('overlay');
@@ -84,8 +85,15 @@ const remotePlayers = new RemotePlayers(scene);
 const remoteMobs = new RemoteMobs(scene);
 const remoteDrops = new RemoteDrops(scene, atlas);
 const viewModel = new ViewModel(atlas);
-const craftPanel = new CraftingPanel(atlasCanvas, (i) => net.craft(i));
+const craftPanel = new CraftingPanel(atlasCanvas, (i) => {
+  sound.knock();
+  net.craft(i);
+});
+const sound = new Sound();
 let hudSelected = -1; // forces the initial viewModel.setItem
+let invTotal = 0; // to tell pickups (gain) from placements (loss)
+let stepAcc = 0;
+let groanTimer = 2;
 const vignette = document.getElementById('vignette');
 let hp = 20;
 
@@ -224,9 +232,13 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
       case 'mobs':
         remoteMobs.updateAll(m.list);
         break;
-      case 'mob_hurt':
+      case 'mob_hurt': {
         remoteMobs.hurt(m.id);
+        const mob = remoteMobs.mobs.get(m.id);
+        const d = mob ? mob.group.position.distanceTo(player.pos) : 99;
+        if (d < 24) sound.hit(1 / (1 + d * 0.2));
         break;
+      }
       case 'mob_gone':
         remoteMobs.remove(m.id);
         break;
@@ -240,7 +252,10 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
         remoteDrops.remove(m.id);
         break;
       case 'health':
-        if (m.hp < hp) damageFlash();
+        if (m.hp < hp) {
+          damageFlash();
+          sound.hurt();
+        }
         hp = m.hp;
         hud.setHealth(hp);
         break;
@@ -248,10 +263,15 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
         player.pos.set(m.spawn[0], m.spawn[1], m.spawn[2]);
         player.vel.set(0, 0, 0);
         break;
-      case 'inventory':
+      case 'inventory': {
         hud.setInventory(new Map(m.items));
         craftPanel.refresh(hud.inventory);
+        const total = m.items.reduce((s, [, n]) => s + n, 0);
+        // Gained items outside the crafting panel: that's a pickup.
+        if (total > invTotal && !craftPanel.open) sound.pop();
+        invTotal = total;
         break;
+      }
     }
   },
   onChunk(cx, cz, blocks) {
@@ -317,6 +337,7 @@ function streamChunks() {
 // --- Pointer lock, mouse and hotbar input -----------------------------------
 
 overlay.addEventListener('click', () => {
+  sound.unlock();
   if (spawned) renderer.domElement.requestPointerLock();
 });
 document.addEventListener('pointerlockchange', () => {
@@ -351,6 +372,7 @@ document.addEventListener('contextmenu', (e) => e.preventDefault());
 let miningDown = false;
 
 document.addEventListener('mousedown', (e) => {
+  sound.unlock();
   if (document.pointerLockElement !== renderer.domElement || !spawned) return;
   if (e.button === 0) {
     viewModel.swing();
@@ -379,6 +401,7 @@ document.addEventListener('mousedown', (e) => {
     net.setBlock(px, py, pz, block);
     hud.consumeOne(block);
     viewModel.swing();
+    sound.place();
   }
 });
 document.addEventListener('mouseup', (e) => {
@@ -457,6 +480,7 @@ function updateMining(hit, dt) {
   if (mining.progress >= mining.time) {
     applyEdit(hit.x, hit.y, hit.z, AIR); // optimistic; server echoes the same
     net.setBlock(hit.x, hit.y, hit.z, AIR);
+    sound.dig();
     mining.key = null;
     crackBox.visible = false;
     return;
@@ -508,7 +532,30 @@ function frame() {
       viewModel.setItem(hud.items[hudSelected]);
     }
     viewModel.matchLight(hemi.intensity, sun.intensity);
-    viewModel.update(dt, Math.hypot(player.vel.x, player.vel.z), miningDown && hit !== null);
+    const horizSpeed = Math.hypot(player.vel.x, player.vel.z);
+    viewModel.update(dt, horizSpeed, miningDown && hit !== null);
+
+    // Footsteps paced by ground distance covered, zombie groans by chance
+    // from wherever the nearest ones actually are.
+    if (player.onGround && horizSpeed > 1) {
+      stepAcc += horizSpeed * dt;
+      if (stepAcc > 2.1) {
+        stepAcc = 0;
+        sound.step();
+      }
+    }
+    groanTimer -= dt;
+    if (groanTimer <= 0) {
+      groanTimer = 2.5 + Math.random() * 4;
+      const mobs = [...remoteMobs.mobs.values()];
+      const mob = mobs[Math.floor(Math.random() * mobs.length)];
+      const d = mob ? mob.group.position.distanceTo(player.pos) : Infinity;
+      if (d < 26) {
+        const to = mob.group.position.clone().sub(player.pos).normalize();
+        const pan = to.x * Math.cos(player.yaw) - to.z * Math.sin(player.yaw);
+        sound.groan(1 / (1 + d * 0.18), pan * 0.8);
+      }
+    }
   }
 
   updateSky(dt);
@@ -547,5 +594,5 @@ frame();
 // Debug handle for tooling and console poking.
 window.__rustcraft = {
   world, player, chunkMeshes, remotePlayers, remoteMobs, remoteDrops, hud, scene, viewModel,
-  craftPanel, crack: { box: crackBox, textures: crackTextures },
+  craftPanel, sound, crack: { box: crackBox, textures: crackTextures },
 };

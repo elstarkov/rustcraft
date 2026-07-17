@@ -155,6 +155,12 @@ Players carry 20 hp rendered as hearts, flash red when hit, and respawn at
 world spawn on death. Swinging back deals 6 with the sword, 3 with other
 tools, 2 bare-handed, with knockback — a zombie dies after 12.
 
+**Sound** — every effect is synthesized by the Web Audio API the moment it
+plays: digs and footsteps are filtered noise bursts, pickups are sine chirps,
+crafting is a wooden double-knock, hurt is a falling square wave, and zombie
+groans are a wobbling low sawtooth faded and stereo-panned by where the
+zombie actually stands. Like the textures, no audio files ship with the game.
+
 **Players** — remote players are blocky avatars (head, body, arms, legs) with
 deterministic per-id skins: shirt and pants colors from a golden-angle hue
 walk, one of four skin tones, hair, and an 8×8 pixel face. The walk cycle is
@@ -178,4 +184,5 @@ Amanatides & Woo voxel raycast, so picking is exact rather than mesh-based.
 - [x] Item drops and a server-authoritative inventory
 - [x] First-person hand with the held block or tool
 - [x] Crafting (logs → planks, sand → glass)
+- [x] Synthesized sound effects (Web Audio, no asset files)
 - [ ] More mob types
