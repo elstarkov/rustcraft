@@ -115,10 +115,13 @@ for (const b of bots) {
     });
   }, 1000 / POS_HZ));
 }
+// Break a fresh column each time: placing needs inventory stock, but breaking
+// always echoes, and y=1 stone is never carved by caves so it's always there.
+let editN = 0;
 timers.push(setInterval(() => {
   if (pending === null) {
     pending = performance.now();
-    bots[0].send({ type: 'set_block', x: 1000, y: 1, z: 1000, id: 3 });
+    bots[0].send({ type: 'set_block', x: 1000 + editN++, y: 1, z: 1000, id: 0 });
   }
 }, 500));
 

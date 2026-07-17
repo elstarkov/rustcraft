@@ -10,6 +10,8 @@ pub enum ClientMsg {
     Pos { x: f32, y: f32, z: f32, yaw: f32, pitch: f32 },
     /// Swing at a mob. `tool` is the held tool kind ("sword", ...), if any.
     Attack { id: u32, tool: Option<String> },
+    /// Craft one batch of a recipe, by index into craft::RECIPES.
+    Craft { recipe: usize },
 }
 
 #[derive(Serialize, Clone)]

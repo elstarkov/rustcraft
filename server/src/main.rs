@@ -1,3 +1,4 @@
+mod craft;
 mod drops;
 mod mobs;
 mod protocol;
@@ -27,12 +28,6 @@ struct Client {
     pos: [f32; 3],
     hp: i32,
     inventory: HashMap<u8, u32>,
-}
-
-/// New players get some build material: planks and glass have no natural
-/// source until crafting exists, everything else is mined.
-fn starter_kit() -> HashMap<u8, u32> {
-    HashMap::from([(block::PLANKS, 32), (block::GLASS, 16)])
 }
 
 fn inventory_snapshot(c: &Client) -> ServerMsg {
@@ -373,7 +368,7 @@ async fn handle_client(server: Arc<Server>, stream: TcpStream) -> Result<(), Err
             name: name.clone(),
             pos: spawn,
             hp: FULL_HP,
-            inventory: starter_kit(),
+            inventory: HashMap::new(),
         },
     );
 
@@ -532,6 +527,28 @@ fn handle_msg(server: &Server, id: u32, msg: ClientMsg) {
             if let Some(msg) = outcome {
                 server.broadcast(&msg, None);
             }
+        }
+        ClientMsg::Craft { recipe } => {
+            let Some(r) = craft::RECIPES.get(recipe) else {
+                return;
+            };
+            let snapshot = {
+                let mut clients = server.clients.lock().unwrap();
+                let Some(c) = clients.get_mut(&id) else { return };
+                let affordable = r
+                    .inputs
+                    .iter()
+                    .all(|(item, n)| c.inventory.get(item).copied().unwrap_or(0) >= *n);
+                if !affordable {
+                    return;
+                }
+                for (item, n) in r.inputs {
+                    *c.inventory.get_mut(item).unwrap() -= n;
+                }
+                *c.inventory.entry(r.output.0).or_insert(0) += r.output.1;
+                inventory_snapshot(c)
+            };
+            server.send_to(id, &snapshot);
         }
         ClientMsg::Pos { x, y, z, yaw, pitch } => {
             if let Some(c) = server.clients.lock().unwrap().get_mut(&id) {

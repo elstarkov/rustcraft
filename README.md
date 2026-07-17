@@ -94,7 +94,7 @@ restarts — untouched terrain keeps regenerating from the seed and costs no
 disk at all.
 
 **Protocol** — JSON text frames for control messages (`hello`, `chunk_req`,
-`set_block`, `pos` → `welcome`, `block_update`, `player_join/pos/leave`,
+`set_block`, `pos`, `craft` → `welcome`, `block_update`, `player_join/pos/leave`,
 `time`, `drop_spawn/drops/drop_gone`, `inventory`) and binary frames for chunk payloads:
 `[kind u8][cx i32][cz i32][16384 block bytes]`.
 
@@ -138,9 +138,8 @@ button. A broken block pops out as a little spinning cube that falls, settles
 it. The inventory is server-authoritative: counts show on the hotbar slots,
 placing consumes stock, and a placement without stock is reverted by the
 server. Every block drops itself, so anything you can see you can collect;
-new players start with a stack of planks and some glass, which have no
-natural source until crafting exists. The sword mines nothing faster — it's
-for fighting. Tools are free and indestructible for now.
+new players start with empty pockets — punch a tree. The sword mines nothing
+faster — it's for fighting. Tools are free and indestructible for now.
 
 **Monsters** — zombies spawn on the surface near players at night (the server
 clock decides) and despawn at dawn, when everyone leaves, or after idling too
