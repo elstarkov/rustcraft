@@ -12,6 +12,7 @@ import { RemotePlayers } from './players.js';
 import { RemoteMobs } from './mobs.js';
 import { RemoteDrops } from './drops.js';
 import { ViewModel } from './viewmodel.js';
+import { CraftingPanel } from './craft.js';
 
 const app = document.getElementById('app');
 const overlay = document.getElementById('overlay');
@@ -83,6 +84,7 @@ const remotePlayers = new RemotePlayers(scene);
 const remoteMobs = new RemoteMobs(scene);
 const remoteDrops = new RemoteDrops(scene, atlas);
 const viewModel = new ViewModel(atlas);
+const craftPanel = new CraftingPanel(atlasCanvas, (i) => net.craft(i));
 let hudSelected = -1; // forces the initial viewModel.setItem
 const vignette = document.getElementById('vignette');
 let hp = 20;
@@ -199,7 +201,7 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
         spawned = true;
         overlayMsg.innerHTML =
           'click to play<br><br>WASD move · SPACE jump/swim · mouse look<br>' +
-          'hold left click mine · right click place · 1-8 / wheel select item';
+          'hold left click mine · right click place · 1-8 / wheel select item · E craft';
         break;
       case 'player_join':
         remotePlayers.add(m.id, m.name, m.pos);
@@ -248,6 +250,7 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
         break;
       case 'inventory':
         hud.setInventory(new Map(m.items));
+        craftPanel.refresh(hud.inventory);
         break;
     }
   },
@@ -262,6 +265,7 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
   onDisconnect() {
     spawned = false;
     document.exitPointerLock();
+    craftPanel.hide();
     overlay.classList.remove('hidden');
     overlayMsg.innerHTML =
       '<span class="error">can\'t reach the server at ws://' +
@@ -317,10 +321,27 @@ overlay.addEventListener('click', () => {
 });
 document.addEventListener('pointerlockchange', () => {
   const locked = document.pointerLockElement === renderer.domElement;
-  overlay.classList.toggle('hidden', locked);
-  if (locked) hud.show();
-  else miningDown = false;
+  // The crafting panel releases the pointer on purpose; don't show the
+  // click-to-play overlay over it.
+  overlay.classList.toggle('hidden', locked || craftPanel.open);
+  if (locked) {
+    hud.show();
+    craftPanel.hide();
+  } else {
+    miningDown = false;
+  }
 });
+
+// E swaps between playing (pointer locked) and the crafting panel.
+function toggleCrafting() {
+  if (craftPanel.open) {
+    craftPanel.hide();
+    renderer.domElement.requestPointerLock();
+  } else if (document.pointerLockElement === renderer.domElement) {
+    craftPanel.show();
+    document.exitPointerLock();
+  }
+}
 document.addEventListener('mousemove', (e) => {
   if (document.pointerLockElement === renderer.domElement) player.onMouseMove(e);
 });
@@ -367,6 +388,7 @@ document.addEventListener('mouseup', (e) => {
 window.addEventListener('keydown', (e) => {
   const n = parseInt(e.key, 10);
   if (n >= 1 && n <= 8) hud.select(n - 1);
+  if (e.code === 'KeyE' && spawned) toggleCrafting();
 });
 window.addEventListener('wheel', (e) => hud.select(hud.selected + Math.sign(e.deltaY)));
 
@@ -525,5 +547,5 @@ frame();
 // Debug handle for tooling and console poking.
 window.__rustcraft = {
   world, player, chunkMeshes, remotePlayers, remoteMobs, remoteDrops, hud, scene, viewModel,
-  crack: { box: crackBox, textures: crackTextures },
+  craftPanel, crack: { box: crackBox, textures: crackTextures },
 };

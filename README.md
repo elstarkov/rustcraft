@@ -78,6 +78,7 @@ cache.
 | left click a zombie | attack — sword 6, tools 3, fists 2 |
 | right click | place block |
 | 1–8 / wheel | select block or tool |
+| E | open / close crafting |
 
 ## How it works
 
@@ -138,8 +139,11 @@ button. A broken block pops out as a little spinning cube that falls, settles
 it. The inventory is server-authoritative: counts show on the hotbar slots,
 placing consumes stock, and a placement without stock is reverted by the
 server. Every block drops itself, so anything you can see you can collect;
-new players start with empty pockets — punch a tree. The sword mines nothing
-faster — it's for fighting. Tools are free and indestructible for now.
+new players start with empty pockets — punch a tree. E opens the crafting
+panel: a log becomes four planks, sand becomes glass, each recipe a click
+(grayed out until you have the ingredients — the server validates and
+applies, the client only draws the menu). The sword mines nothing faster —
+it's for fighting. Tools are free and indestructible for now.
 
 **Monsters** — zombies spawn on the surface near players at night (the server
 clock decides) and despawn at dawn, when everyone leaves, or after idling too
@@ -173,5 +177,5 @@ Amanatides & Woo voxel raycast, so picking is exact rather than mesh-based.
 - [x] Zombies at night, player health and respawn
 - [x] Item drops and a server-authoritative inventory
 - [x] First-person hand with the held block or tool
-- [ ] Crafting
+- [x] Crafting (logs → planks, sand → glass)
 - [ ] More mob types

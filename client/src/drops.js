@@ -27,7 +27,7 @@ export class RemoteDrops {
     const target = new THREE.Vector3(pos[0], pos[1], pos[2]);
     mesh.position.copy(target);
     this.scene.add(mesh);
-    this.drops.set(id, { mesh, target, phase: (id % 32) * 0.7 });
+    this.drops.set(id, { item, mesh, target, phase: (id % 32) * 0.7 });
   }
 
   updateAll(list) {
