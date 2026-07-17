@@ -15,6 +15,7 @@ import { ViewModel } from './viewmodel.js';
 import { CraftingPanel } from './craft.js';
 import { Sound } from './sound.js';
 import { Chat } from './chat.js';
+import { Torches } from './torches.js';
 
 const app = document.getElementById('app');
 const overlay = document.getElementById('overlay');
@@ -85,6 +86,7 @@ const player = new Player(world, camera);
 const remotePlayers = new RemotePlayers(scene);
 const remoteMobs = new RemoteMobs(scene);
 const remoteDrops = new RemoteDrops(scene, atlas);
+const torches = new Torches(scene);
 const viewModel = new ViewModel(atlas);
 const craftPanel = new CraftingPanel(atlasCanvas, (i) => {
   sound.knock();
@@ -209,6 +211,8 @@ function playerName() {
 
 function applyEdit(x, y, z, id) {
   for (const key of world.setBlock(x, y, z, id)) chunkMeshes.markDirty(key);
+  const key = chunkKey(Math.floor(x / CHUNK_SIZE), Math.floor(z / CHUNK_SIZE));
+  torches.sync(key, world.chunks.get(key));
 }
 
 const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
@@ -305,6 +309,7 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
   onChunk(cx, cz, blocks) {
     world.setChunk(cx, cz, new Uint8Array(blocks));
     chunkMeshes.markDirty(chunkKey(cx, cz));
+    torches.sync(chunkKey(cx, cz), world.chunks.get(chunkKey(cx, cz)));
     // Border faces of already-loaded neighbors may now be hidden or exposed.
     for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       if (world.hasChunk(cx + dx, cz + dz)) chunkMeshes.markDirty(chunkKey(cx + dx, cz + dz));
@@ -357,6 +362,7 @@ function streamChunks() {
       world.dropChunk(cx, cz);
       chunkMeshes.remove(key);
       chunkMeshes.dirty.delete(key);
+      torches.removeChunk(key);
       requested.delete(key);
     }
   }
@@ -608,6 +614,7 @@ function frame() {
   remotePlayers.update(dt);
   remoteMobs.update(dt);
   remoteDrops.update(dt);
+  torches.update(dt, player.pos);
   chunkMeshes.process(4);
 
   fpsFrames++;
@@ -640,6 +647,7 @@ frame();
 // Debug handle for tooling and console poking.
 window.__rustcraft = {
   world, player, chunkMeshes, remotePlayers, remoteMobs, remoteDrops, hud, scene, viewModel,
-  craftPanel, sound, chat, net, crack: { box: crackBox, textures: crackTextures },
+  craftPanel, sound, chat, net, torches, applyEdit,
+  crack: { box: crackBox, textures: crackTextures },
   get hp() { return hp; },
 };

@@ -121,7 +121,11 @@ evicted when far away. The first-person hand — an arm in your avatar's skin
 holding the selected block or tool — lives in a tiny camera-space scene
 rendered as a second pass over a cleared depth buffer, so it never clips into
 walls; it swings on use, keeps chopping while you mine, bobs as you walk, and
-darkens with the night.
+darkens with the night. Torches aren't cubes: the mesher skips their cells
+entirely and each one gets a tiny stick-and-ember model instead. Their light
+is a fixed pool of ten point lights reassigned to the torches nearest the
+player every frame, with a flicker — a fixed pool means placing the fiftieth
+torch costs nothing and never recompiles a shader.
 
 The mesher exists twice: `mesher-wasm/` is a Rust port compiled to a 22 KB
 wasm module (raw pointer ABI, no bindgen) that the worker prefers — ~5× faster
@@ -141,9 +145,11 @@ it. The inventory is server-authoritative: counts show on the hotbar slots,
 placing consumes stock, and a placement without stock is reverted by the
 server. Every block drops itself, so anything you can see you can collect;
 new players start with empty pockets — punch a tree. E opens the crafting
-panel: a log becomes four planks, sand becomes glass, each recipe a click
-(grayed out until you have the ingredients — the server validates and
-applies, the client only draws the menu). The sword mines nothing faster —
+panel: a log becomes four planks, sand becomes glass, and a coal ore plus a
+plank make four torches — each recipe a click (grayed out until you have the
+ingredients — the server validates and applies, the client only draws the
+menu). Torches are non-solid little lights you can plant anywhere, which
+finally gives coal a purpose. The sword mines nothing faster —
 it's for fighting. Tools are free and indestructible for now.
 
 **Monsters** — zombies spawn on the surface near players at night (the server
@@ -197,4 +203,5 @@ which makes lakes the fast way down a mountain.
 - [x] Fall damage (water breaks a fall)
 - [x] Chat with join, leave and death announcements
 - [x] Death screen naming the cause
+- [x] Torches — craftable light for the night
 - [ ] More mob types

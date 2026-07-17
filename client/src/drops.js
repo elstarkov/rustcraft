@@ -1,5 +1,7 @@
 import * as THREE from 'three';
+import { TORCH } from './blocks.js';
 import { blockGeometry } from './blockgeo.js';
+import { makeTorch } from './torches.js';
 
 // Dropped items streamed from the server: small textured cubes that spin
 // and bob in place. The server position is the item's bottom; the mesh is
@@ -23,7 +25,13 @@ export class RemoteDrops {
 
   add(id, item, pos) {
     if (this.drops.has(id)) this.remove(id);
-    const mesh = new THREE.Mesh(this.geometry(item), this.material);
+    let mesh;
+    if (item === TORCH) {
+      mesh = makeTorch(); // a mini torch model, not a texture cube
+      mesh.scale.setScalar(0.55);
+    } else {
+      mesh = new THREE.Mesh(this.geometry(item), this.material);
+    }
     const target = new THREE.Vector3(pos[0], pos[1], pos[2]);
     mesh.position.copy(target);
     this.scene.add(mesh);

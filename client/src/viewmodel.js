@@ -1,7 +1,9 @@
 import * as THREE from 'three';
+import { TORCH } from './blocks.js';
 import { blockGeometry } from './blockgeo.js';
 import { drawToolIcon } from './items.js';
 import { makePalette } from './players.js';
+import { makeTorch } from './torches.js';
 
 // First-person hand: an arm holding the selected block or tool, rendered as
 // a second pass into a tiny camera-space scene with the depth buffer cleared
@@ -60,7 +62,11 @@ export class ViewModel {
   setItem(item) {
     if (this.held) this.holder.remove(this.held); // resources are cached
     this.held = null;
-    if (item?.block != null) {
+    if (item?.block === TORCH) {
+      this.held = makeTorch();
+      this.held.scale.setScalar(0.8);
+      this.held.position.y = -0.18; // model origin is at its base
+    } else if (item?.block != null) {
       if (!this.geometries.has(item.block)) {
         this.geometries.set(item.block, blockGeometry(item.block, 0.22));
       }
