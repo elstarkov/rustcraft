@@ -60,6 +60,8 @@ struct Server {
     start_frac: f64,
     /// RUSTCRAFT_SPAWN forces every hostile spawn to one kind (testing).
     forced_spawn: Option<mobs::Kind>,
+    /// RUSTCRAFT_CREATIVE=1: placing needs no stock and consumes nothing.
+    creative: bool,
 }
 
 impl Server {
@@ -116,6 +118,7 @@ async fn main() {
         started: std::time::Instant::now(),
         start_frac,
         forced_spawn,
+        creative: std::env::var("RUSTCRAFT_CREATIVE").is_ok_and(|v| v == "1"),
     });
 
     // Mob AI runs at 10 Hz.
@@ -203,6 +206,10 @@ fn tick_mobs(server: &Server, rng: &mut mobs::Rng) {
             let x = (p[0] + ang.cos() * dist).floor() as i32;
             let z = (p[2] + ang.sin() * dist).floor() as i32;
             if let Some(pos) = mobs::spawn_spot(world, x, z) {
+                // Torchlight keeps the monsters out; sheep don't mind it.
+                if kind.hostile() && world.torch_near(pos, 8.0) {
+                    return;
+                }
                 let id = server.next_mob_id.fetch_add(1, Ordering::Relaxed);
                 mob_map.insert(id, Mob::new(id, kind, pos));
                 events.push(ServerMsg::MobSpawn {
@@ -568,7 +575,7 @@ fn handle_msg(server: &Server, id: u32, msg: ClientMsg) {
             // Placing needs stock. Check-then-consume can't race with itself:
             // a client's messages are handled serially by its own read loop,
             // and other players only ever add to someone's inventory.
-            if bid != block::AIR {
+            if bid != block::AIR && !server.creative {
                 let has = server
                     .clients
                     .lock()
@@ -604,7 +611,7 @@ fn handle_msg(server: &Server, id: u32, msg: ClientMsg) {
                     server.drops.lock().unwrap().insert(did, d);
                     server.broadcast(&msg, None);
                 }
-            } else {
+            } else if !server.creative {
                 // Placing consumes one from stock.
                 let snapshot = {
                     let mut clients = server.clients.lock().unwrap();

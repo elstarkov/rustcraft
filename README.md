@@ -50,6 +50,16 @@ Click to grab the mouse and play. To play over LAN, run `npm run dev -- --host`
 and have friends open `http://<your-ip>:5173` — the client connects to the
 WebSocket server on the same hostname.
 
+### Dev switches
+
+Server environment variables, handy for testing:
+
+| Var | Effect |
+| --- | --- |
+| `RUSTCRAFT_TIME=0.6` | start the world clock at a day fraction (0 sunrise, 0.25 noon, 0.5 sunset) |
+| `RUSTCRAFT_SPAWN=skeleton` | force every hostile spawn to one kind (zombie, skeleton, spider) |
+| `RUSTCRAFT_CREATIVE=1` | placing blocks needs no stock and consumes nothing |
+
 ### Benchmarking
 
 `bench/` contains a protocol-level test suite for the server:
@@ -150,13 +160,14 @@ panel: a log becomes four planks, sand becomes glass, and a coal ore plus a
 plank make four torches — each recipe a click (grayed out until you have the
 ingredients — the server validates and applies, the client only draws the
 menu). Torches are non-solid little lights you can plant anywhere, which
-finally gives coal a purpose. The sword mines nothing faster —
+finally gives coal a purpose — and hostile mobs refuse to spawn within eight
+blocks of one, so a lit perimeter keeps the night outside. The sword mines nothing faster —
 it's for fighting. Tools are free and indestructible for now.
 
 **Monsters & animals** — hostile mobs spawn on the surface near players at
-night (the server clock decides, weighted zombie/skeleton/spider) and vanish
-at dawn, when everyone leaves, or after idling too long — usually that means
-one fell into a cave mid-chase. Zombies chase and swing for 3; skeletons
+night (the server clock decides, weighted zombie/skeleton/spider), never
+within eight blocks of a torch, and vanish at dawn, when everyone leaves, or
+after idling too long — usually that means one fell into a cave mid-chase. Zombies chase and swing for 3; skeletons
 hold a 6–16 block band and, with line of sight, loose ballistic arrows that
 hit for 4; spiders sprint low and pounce from mid range for 2. Sheep graze
 near players at any hour and bolt when hit. AI runs server-side at 10 Hz
@@ -209,5 +220,5 @@ which makes lakes the fast way down a mountain.
 - [x] Fall damage (water breaks a fall)
 - [x] Chat with join, leave and death announcements
 - [x] Death screen naming the cause
-- [x] Torches — craftable light for the night
+- [x] Torches — craftable light that keeps monsters from spawning nearby
 - [x] More mob types — skeletons with arrows, spiders, sheep

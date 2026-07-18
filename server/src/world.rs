@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::PathBuf;
 
@@ -69,6 +69,9 @@ pub struct World {
     cave: Perlin,
     tunnel: Perlin,
     chunks: HashMap<(i32, i32), Chunk>,
+    /// World positions of every torch in loaded chunks, so spawn checks
+    /// don't have to scan blocks. Chunks are never evicted server-side.
+    torches: HashSet<(i32, i32, i32)>,
     save_dir: PathBuf,
 }
 
@@ -81,6 +84,7 @@ impl World {
             cave: Perlin::new(seed.wrapping_add(1)),
             tunnel: Perlin::new(seed.wrapping_add(2)),
             chunks: HashMap::new(),
+            torches: HashSet::new(),
             save_dir,
         }
     }
@@ -277,6 +281,21 @@ impl World {
     pub fn chunk(&mut self, cx: i32, cz: i32) -> &Chunk {
         if !self.chunks.contains_key(&(cx, cz)) {
             let c = self.load(cx, cz).unwrap_or_else(|| self.generate(cx, cz));
+            // Torches only exist in saved player edits, but scanning every
+            // fresh chunk keeps the registry unconditionally right.
+            for y in 0..WORLD_HEIGHT {
+                for z in 0..CHUNK_SIZE {
+                    for x in 0..CHUNK_SIZE {
+                        if c.get(x, y, z) == block::TORCH {
+                            self.torches.insert((
+                                cx * CHUNK_SIZE as i32 + x as i32,
+                                y as i32,
+                                cz * CHUNK_SIZE as i32 + z as i32,
+                            ));
+                        }
+                    }
+                }
+            }
             self.chunks.insert((cx, cz), c);
         }
         &self.chunks[&(cx, cz)]
@@ -292,14 +311,30 @@ impl World {
         );
         self.chunk(cx, cz); // make sure it exists
         let chunk = self.chunks.get_mut(&(cx, cz)).unwrap();
-        chunk.set(
+        let (lx, ly, lz) = (
             x.rem_euclid(CHUNK_SIZE as i32) as usize,
             y as usize,
             z.rem_euclid(CHUNK_SIZE as i32) as usize,
-            id,
         );
+        if chunk.get(lx, ly, lz) == block::TORCH {
+            self.torches.remove(&(x, y, z));
+        }
+        if id == block::TORCH {
+            self.torches.insert((x, y, z));
+        }
+        chunk.set(lx, ly, lz, id);
         self.persist(cx, cz);
         true
+    }
+
+    /// Any torch within `r` blocks (3D)? Hostile mobs won't spawn in its
+    /// light.
+    pub fn torch_near(&self, pos: [f32; 3], r: f32) -> bool {
+        let r2 = r * r;
+        self.torches.iter().any(|&(tx, ty, tz)| {
+            let d = [tx as f32 + 0.5 - pos[0], ty as f32 - pos[1], tz as f32 + 0.5 - pos[2]];
+            d[0] * d[0] + d[1] * d[1] + d[2] * d[2] < r2
+        })
     }
 
     pub fn block_at(&mut self, x: i32, y: i32, z: i32) -> u8 {
