@@ -4,6 +4,7 @@
 
 import {
   COAL_ORE, DIRT, GLASS, GOLD_ORE, GRASS, IRON_ORE, LEAVES, LOG, PLANKS, SAND, STONE, TORCH,
+  isTorch,
 } from './blocks.js';
 
 /// Seconds to break a block bare-handed (or with the wrong tool).
@@ -34,7 +35,7 @@ export const FIST_DAMAGE = 2;
 export const TOOL_SPEEDUP = 5;
 
 export function miningTime(blockId, tool) {
-  const base = HARDNESS[blockId] ?? 1;
+  const base = HARDNESS[isTorch(blockId) ? TORCH : blockId] ?? 1;
   return tool && tool.speeds.includes(blockId) ? base / TOOL_SPEEDUP : base;
 }
 

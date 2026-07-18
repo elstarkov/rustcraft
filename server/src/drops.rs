@@ -24,6 +24,9 @@ pub fn drop_for(id: u8, roll: f32) -> Option<u8> {
     if id == block::LEAVES && roll < 0.15 {
         return Some(block::APPLE);
     }
+    if block::is_torch(id) {
+        return Some(block::TORCH); // wall variants drop the one torch item
+    }
     (id != block::AIR && id != block::WATER).then_some(id)
 }
 
@@ -102,5 +105,5 @@ impl Drop {
 
 fn solid_at(world: &mut World, x: f32, y: f32, z: f32) -> bool {
     let id = world.block_at(x.floor() as i32, y.floor() as i32, z.floor() as i32);
-    id != block::AIR && id != block::WATER && id != block::TORCH
+    id != block::AIR && id != block::WATER && !block::is_torch(id)
 }

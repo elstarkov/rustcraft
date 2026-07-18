@@ -162,7 +162,10 @@ plank make four torches — each recipe a click (grayed out until you have the
 ingredients — the server validates and applies, the client only draws the
 menu). Torches are non-solid little lights you can plant anywhere, which
 finally gives coal a purpose — and hostile mobs refuse to spawn within eight
-blocks of one, so a lit perimeter keeps the night outside. The sword mines nothing faster —
+blocks of one, so a lit perimeter keeps the night outside. Click a wall face
+and the torch mounts there, leaning off the wall; orientation is four extra
+block ids (the world stores one byte per block), but every variant costs and
+drops the same torch item. The sword mines nothing faster —
 it's for fighting. Tools are free and indestructible for now.
 
 **Monsters & animals** — hostile mobs spawn on the surface near players at
@@ -233,3 +236,4 @@ which makes lakes the fast way down a mountain.
 - [x] More mob types — skeletons with arrows, spiders, sheep
 - [x] Hunger — apples from leaves, starvation, food-driven regen
 - [x] Drowning, with an air meter
+- [x] Wall-mounted torches

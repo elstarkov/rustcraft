@@ -21,7 +21,7 @@ pub enum Fate {
 }
 
 fn solid(id: u8) -> bool {
-    id != block::AIR && id != block::WATER && id != block::TORCH
+    id != block::AIR && id != block::WATER && !block::is_torch(id)
 }
 
 impl Arrow {

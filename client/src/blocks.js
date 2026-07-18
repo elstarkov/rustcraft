@@ -18,6 +18,16 @@ export const IRON_ORE = 11;
 export const GOLD_ORE = 12;
 export const TORCH = 13;
 export const APPLE = 14;
+// Wall-mounted torch variants, named for the side of the cell holding the
+// supporting wall. One inventory item (TORCH) covers them all.
+export const TORCH_WALL_PX = 15;
+export const TORCH_WALL_NX = 16;
+export const TORCH_WALL_PZ = 17;
+export const TORCH_WALL_NZ = 18;
+
+export function isTorch(id) {
+  return id === TORCH || (id >= TORCH_WALL_PX && id <= TORCH_WALL_NZ);
+}
 
 // Atlas tile index per face: [top, bottom, side]
 export const BLOCKS = {
@@ -38,6 +48,10 @@ export const BLOCKS = {
   [TORCH]: { name: 'torch', tiles: [8, 8, 8], seeThrough: true },
   // Food item — lives in inventories and drops, never in the world.
   [APPLE]: { name: 'apple', tiles: [1, 1, 1], seeThrough: true },
+  [TORCH_WALL_PX]: { name: 'torch', tiles: [8, 8, 8], seeThrough: true },
+  [TORCH_WALL_NX]: { name: 'torch', tiles: [8, 8, 8], seeThrough: true },
+  [TORCH_WALL_PZ]: { name: 'torch', tiles: [8, 8, 8], seeThrough: true },
+  [TORCH_WALL_NZ]: { name: 'torch', tiles: [8, 8, 8], seeThrough: true },
 };
 
 // What the hotbar offers, in slot order. Ores are placeable so mined ore
@@ -48,7 +62,7 @@ export const PLACEABLE = [
 
 // Blocks the player collides with.
 export function isSolid(id) {
-  return id !== AIR && id !== WATER && id !== TORCH;
+  return id !== AIR && id !== WATER && !isTorch(id);
 }
 
 // Blocks that don't fully hide the face of a neighboring block.

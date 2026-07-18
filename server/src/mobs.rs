@@ -124,7 +124,7 @@ impl Rng {
 }
 
 fn solid(id: u8) -> bool {
-    id != block::AIR && id != block::WATER && id != block::TORCH
+    id != block::AIR && id != block::WATER && !block::is_torch(id)
 }
 
 /// Straight-line visibility between two points, stepped at 0.3 blocks.

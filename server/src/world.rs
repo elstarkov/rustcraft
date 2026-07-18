@@ -27,6 +27,17 @@ pub mod block {
     pub const TORCH: u8 = 13;
     /// Food item: exists only in inventories and drops, never in the world.
     pub const APPLE: u8 = 14;
+    /// Wall-mounted torch variants, named for the side of the cell holding
+    /// the supporting wall. One inventory item (TORCH) covers them all —
+    /// placement picks the variant, breaking drops the plain torch.
+    pub const TORCH_WALL_PX: u8 = 15;
+    pub const TORCH_WALL_NX: u8 = 16;
+    pub const TORCH_WALL_PZ: u8 = 17;
+    pub const TORCH_WALL_NZ: u8 = 18;
+
+    pub fn is_torch(id: u8) -> bool {
+        matches!(id, TORCH | TORCH_WALL_PX | TORCH_WALL_NX | TORCH_WALL_PZ | TORCH_WALL_NZ)
+    }
 
     /// Blocks a client is allowed to place. Water flows only from world gen.
     /// Ores are placeable so mined ore isn't a dead item (no crafting yet).
@@ -34,8 +45,8 @@ pub mod block {
         matches!(
             id,
             GRASS | DIRT | STONE | SAND | LOG | LEAVES | PLANKS | GLASS
-                | COAL_ORE | IRON_ORE | GOLD_ORE | TORCH
-        )
+                | COAL_ORE | IRON_ORE | GOLD_ORE
+        ) || is_torch(id)
     }
 }
 
@@ -288,7 +299,7 @@ impl World {
             for y in 0..WORLD_HEIGHT {
                 for z in 0..CHUNK_SIZE {
                     for x in 0..CHUNK_SIZE {
-                        if c.get(x, y, z) == block::TORCH {
+                        if block::is_torch(c.get(x, y, z)) {
                             self.torches.insert((
                                 cx * CHUNK_SIZE as i32 + x as i32,
                                 y as i32,
@@ -318,10 +329,10 @@ impl World {
             y as usize,
             z.rem_euclid(CHUNK_SIZE as i32) as usize,
         );
-        if chunk.get(lx, ly, lz) == block::TORCH {
+        if block::is_torch(chunk.get(lx, ly, lz)) {
             self.torches.remove(&(x, y, z));
         }
-        if id == block::TORCH {
+        if block::is_torch(id) {
             self.torches.insert((x, y, z));
         }
         chunk.set(lx, ly, lz, id);
@@ -358,7 +369,7 @@ impl World {
     pub fn surface_y(&mut self, x: i32, z: i32) -> Option<i32> {
         (0..WORLD_HEIGHT as i32).rev().find(|&y| {
             let id = self.block_at(x, y, z);
-            id != block::AIR && id != block::WATER && id != block::TORCH
+            id != block::AIR && id != block::WATER && !block::is_torch(id)
         })
     }
 

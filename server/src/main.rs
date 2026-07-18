@@ -642,16 +642,18 @@ fn handle_msg(server: &Server, id: u32, msg: ClientMsg) {
             if !allowed {
                 return;
             }
-            // Placing needs stock. Check-then-consume can't race with itself:
-            // a client's messages are handled serially by its own read loop,
+            // Placing needs stock — wall torch variants all cost the one
+            // torch item. Check-then-consume can't race with itself: a
+            // client's messages are handled serially by its own read loop,
             // and other players only ever add to someone's inventory.
+            let cost = if block::is_torch(bid) { block::TORCH } else { bid };
             if bid != block::AIR && !server.creative {
                 let has = server
                     .clients
                     .lock()
                     .unwrap()
                     .get(&id)
-                    .is_some_and(|c| c.inventory.get(&bid).copied().unwrap_or(0) > 0);
+                    .is_some_and(|c| c.inventory.get(&cost).copied().unwrap_or(0) > 0);
                 if !has {
                     // Revert the sender's optimistic local edit.
                     let current = server.world.lock().unwrap().block_at(x, y, z);
@@ -686,7 +688,7 @@ fn handle_msg(server: &Server, id: u32, msg: ClientMsg) {
                 let snapshot = {
                     let mut clients = server.clients.lock().unwrap();
                     clients.get_mut(&id).map(|c| {
-                        let n = c.inventory.entry(bid).or_insert(0);
+                        let n = c.inventory.entry(cost).or_insert(0);
                         *n = n.saturating_sub(1);
                         inventory_snapshot(c)
                     })
