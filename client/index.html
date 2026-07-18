@@ -48,11 +48,23 @@
         pointer-events: none; white-space: pre;
       }
       #hearts {
-        position: fixed; left: 50%; bottom: 64px; transform: translateX(-50%);
+        position: fixed; right: 50%; bottom: 64px; margin-right: 8px;
         z-index: 5; font-size: 18px; letter-spacing: 2px; color: #e2312f;
         text-shadow: 0 0 3px #000; pointer-events: none; user-select: none;
       }
       #hearts .lost { color: rgba(255, 255, 255, 0.25); }
+      #food {
+        position: fixed; left: 50%; bottom: 64px; margin-left: 8px;
+        z-index: 5; font-size: 15px; letter-spacing: 2px;
+        text-shadow: 0 0 3px #000; pointer-events: none; user-select: none;
+      }
+      #food .lost { filter: grayscale(1) brightness(0.55); opacity: 0.5; }
+      #bubbles {
+        position: fixed; left: 50%; bottom: 90px; margin-left: 8px;
+        z-index: 5; font-size: 13px; letter-spacing: 4px; color: #8fd0ff;
+        text-shadow: 0 0 3px #000; pointer-events: none; user-select: none;
+      }
+      #bubbles .lost { color: rgba(255, 255, 255, 0.2); }
       #chat {
         position: fixed; left: 10px; bottom: 92px; z-index: 6; width: 400px;
         max-height: 40vh; overflow: hidden; display: flex; flex-direction: column;
@@ -114,6 +126,8 @@
     <div id="crosshair" class="hidden">+</div>
     <div id="hotbar" class="hidden"></div>
     <div id="hearts" class="hidden"></div>
+    <div id="food" class="hidden"></div>
+    <div id="bubbles" class="hidden"></div>
     <div id="crafting" class="hidden"></div>
     <div id="chat"></div>
     <input id="chat-input" class="hidden" maxlength="200" autocomplete="off" spellcheck="false" />
