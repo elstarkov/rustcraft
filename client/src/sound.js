@@ -120,6 +120,43 @@ export class Sound {
     this.tone('sine', 210, 130, 0.09, 0.3 * gain);
   }
 
+  /// Skeleton ambience: dry bone clicks.
+  rattle(gain, pan = 0) {
+    for (let i = 0; i < 4; i++) {
+      this.tone('square', 1900 + Math.random() * 500, 1500, 0.03, 0.12 * gain, {
+        pan, delay: i * 0.07,
+      });
+    }
+  }
+
+  /// Spider ambience: a thin hiss.
+  hiss(gain, pan = 0) {
+    this.noise(0.45, 2600, 0.2 * gain, pan);
+  }
+
+  /// Sheep ambience.
+  baa(gain, pan = 0) {
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    const o = this.ctx.createOscillator();
+    o.type = 'sawtooth';
+    o.frequency.setValueAtTime(230, t);
+    o.frequency.exponentialRampToValueAtTime(180, t + 0.55);
+    const lfo = this.ctx.createOscillator();
+    lfo.frequency.value = 9;
+    const wobble = this.ctx.createGain();
+    wobble.gain.value = 28;
+    lfo.connect(wobble).connect(o.frequency);
+    const f = this.ctx.createBiquadFilter();
+    f.type = 'lowpass';
+    f.frequency.value = 900;
+    o.connect(f).connect(this.env(0.32 * gain, 0.55, pan, 0.06));
+    o.start(t);
+    lfo.start(t);
+    o.stop(t + 0.7);
+    lfo.stop(t + 0.7);
+  }
+
   /// Zombie ambience: a wobbling, muffled sawtooth. gain/pan set by the
   /// caller from distance and direction.
   groan(gain, pan = 0) {

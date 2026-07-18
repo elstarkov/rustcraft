@@ -104,7 +104,12 @@ const deathCauseEl = document.getElementById('death-cause');
 let deathShownAt = 0;
 let hp = 20;
 
-const DEATH_PHRASES = { zombie: 'slain by a zombie', fall: 'you fell from a high place' };
+const DEATH_PHRASES = {
+  zombie: 'slain by a zombie',
+  spider: 'slain by a spider',
+  skeleton: 'shot by a skeleton',
+  fall: 'you fell from a high place',
+};
 
 // Landings: always a thump, and past three blocks the server takes hearts.
 player.onLand = (fall) => {
@@ -604,8 +609,10 @@ function frame() {
       const d = mob ? mob.group.position.distanceTo(player.pos) : Infinity;
       if (d < 26) {
         const to = mob.group.position.clone().sub(player.pos).normalize();
-        const pan = to.x * Math.cos(player.yaw) - to.z * Math.sin(player.yaw);
-        sound.groan(1 / (1 + d * 0.18), pan * 0.8);
+        const pan = (to.x * Math.cos(player.yaw) - to.z * Math.sin(player.yaw)) * 0.8;
+        const gain = 1 / (1 + d * 0.18);
+        const voice = { zombie: 'groan', skeleton: 'rattle', spider: 'hiss', sheep: 'baa' };
+        sound[voice[mob.kind] ?? 'groan'](gain, pan);
       }
     }
   }
