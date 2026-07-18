@@ -1,3 +1,4 @@
+mod arrows;
 mod craft;
 mod drops;
 mod mobs;
@@ -13,6 +14,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio_tungstenite::tungstenite::Message;
 
+use arrows::Arrow;
 use drops::Drop;
 use mobs::Mob;
 use protocol::{encode_chunk, ClientMsg, PlayerInfo, ServerMsg};
@@ -49,11 +51,15 @@ struct Server {
     clients: Mutex<HashMap<u32, Client>>,
     mobs: Mutex<HashMap<u32, Mob>>,
     drops: Mutex<HashMap<u32, Drop>>,
+    arrows: Mutex<HashMap<u32, Arrow>>,
     next_id: AtomicU32,
     next_mob_id: AtomicU32,
     next_drop_id: AtomicU32,
+    next_arrow_id: AtomicU32,
     started: std::time::Instant,
     start_frac: f64,
+    /// RUSTCRAFT_SPAWN forces every hostile spawn to one kind (testing).
+    forced_spawn: Option<mobs::Kind>,
 }
 
 impl Server {
@@ -94,16 +100,22 @@ async fn main() {
         .ok()
         .and_then(|v| v.parse::<f64>().ok())
         .unwrap_or(0.1);
+    let forced_spawn = std::env::var("RUSTCRAFT_SPAWN")
+        .ok()
+        .and_then(|v| mobs::Kind::parse(&v));
     let server = Arc::new(Server {
         world: Mutex::new(world),
         clients: Mutex::new(HashMap::new()),
         mobs: Mutex::new(HashMap::new()),
         drops: Mutex::new(HashMap::new()),
+        arrows: Mutex::new(HashMap::new()),
         next_id: AtomicU32::new(1),
         next_mob_id: AtomicU32::new(1),
         next_drop_id: AtomicU32::new(1),
+        next_arrow_id: AtomicU32::new(1),
         started: std::time::Instant::now(),
         start_frac,
+        forced_spawn,
     });
 
     // Mob AI runs at 10 Hz.
@@ -114,6 +126,7 @@ async fn main() {
         loop {
             tick.tick().await;
             tick_mobs(&mob_server, &mut rng);
+            tick_arrows(&mob_server);
             tick_drops(&mob_server);
         }
     });
@@ -159,47 +172,84 @@ fn tick_mobs(server: &Server, rng: &mut mobs::Rng) {
         .collect();
 
     let mut events: Vec<ServerMsg> = Vec::new();
-    let mut hits: Vec<u32> = Vec::new();
+    let mut hits: Vec<(u32, i32, &'static str)> = Vec::new();
+    let mut shots: Vec<([f32; 3], [f32; 3])> = Vec::new(); // shooter pos, target pos
     {
         let mut world = server.world.lock().unwrap();
         let mut mob_map = server.mobs.lock().unwrap();
 
-        // Day breaks, everyone left, wandered too far, or idled too long
-        // (usually fallen into a cave): gone.
+        // Hostiles vanish at dawn; anything goes when everyone left, it
+        // wandered too far, or it idled too long (usually fallen into a
+        // cave).
         mob_map.retain(|id, m| {
             let near_someone = players
                 .iter()
                 .any(|(_, p)| (p[0] - m.pos[0]).hypot(p[2] - m.pos[2]) < 56.0);
-            let keep = night && near_someone && !m.is_stale();
+            let keep = near_someone && !m.is_stale() && (night || !m.kind.hostile());
             if !keep {
                 events.push(ServerMsg::MobGone { id: *id });
             }
             keep
         });
 
-        let cap = (players.len() * 4).min(16);
-        if night && !players.is_empty() && mob_map.len() < cap && rng.unit() < 0.2 {
+        let mut spawn = |mob_map: &mut HashMap<u32, Mob>,
+                         world: &mut World,
+                         rng: &mut mobs::Rng,
+                         kind: mobs::Kind,
+                         min_dist: f32| {
             let (_, p) = players[rng.next() as usize % players.len()];
             let ang = rng.unit() * std::f32::consts::TAU;
-            let dist = 14.0 + rng.unit() * 12.0;
+            let dist = min_dist + rng.unit() * 12.0;
             let x = (p[0] + ang.cos() * dist).floor() as i32;
             let z = (p[2] + ang.sin() * dist).floor() as i32;
-            if let Some(pos) = mobs::spawn_spot(&mut world, x, z) {
+            if let Some(pos) = mobs::spawn_spot(world, x, z) {
                 let id = server.next_mob_id.fetch_add(1, Ordering::Relaxed);
-                mob_map.insert(id, Mob::new(id, pos));
+                mob_map.insert(id, Mob::new(id, kind, pos));
                 events.push(ServerMsg::MobSpawn {
                     id,
-                    kind: "zombie".into(),
+                    kind: kind.name().into(),
                     x: pos[0],
                     y: pos[1],
                     z: pos[2],
                 });
             }
+        };
+
+        if !players.is_empty() {
+            let hostiles = mob_map.values().filter(|m| m.kind.hostile()).count();
+            let cap = (players.len() * 4).min(16);
+            if night && hostiles < cap && rng.unit() < 0.2 {
+                let kind = server.forced_spawn.unwrap_or_else(|| {
+                    let r = rng.unit();
+                    if r < 0.5 {
+                        mobs::Kind::Zombie
+                    } else if r < 0.8 {
+                        mobs::Kind::Skeleton
+                    } else {
+                        mobs::Kind::Spider
+                    }
+                });
+                spawn(&mut mob_map, &mut world, rng, kind, 14.0);
+            }
+
+            // Sheep graze at any hour, in smaller numbers and closer by.
+            let sheep = mob_map.len() - hostiles;
+            if sheep < (players.len() * 2).min(8) && rng.unit() < 0.04 {
+                spawn(&mut mob_map, &mut world, rng, mobs::Kind::Sheep, 10.0);
+            }
         }
 
         for m in mob_map.values_mut() {
-            if let Some(pid) = m.tick(&mut world, &players, DT, rng) {
-                hits.push(pid);
+            match m.tick(&mut world, &players, DT, rng) {
+                Some(mobs::Action::Melee(pid)) => {
+                    hits.push((pid, m.kind.melee_damage(), m.kind.name()));
+                }
+                Some(mobs::Action::Shoot(pid)) => {
+                    if let Some((_, p)) = players.iter().find(|(id, _)| *id == pid) {
+                        shots.push((m.pos, *p));
+                    }
+                }
+                None => {}
             }
         }
 
@@ -213,11 +263,74 @@ fn tick_mobs(server: &Server, rng: &mut mobs::Rng) {
         }
     }
 
+    // Loose arrows: aimed straight at the target with a little arc
+    // compensation for gravity over the flight.
+    for (mpos, ppos) in shots {
+        let from = [mpos[0], mpos[1] + 1.5, mpos[2]];
+        let to = [ppos[0], ppos[1] + 1.4, ppos[2]];
+        let d = [to[0] - from[0], to[1] - from[1], to[2] - from[2]];
+        let len = (d[0] * d[0] + d[1] * d[1] + d[2] * d[2]).sqrt().max(0.01);
+        let mut vel = [d[0] / len * 18.0, d[1] / len * 18.0, d[2] / len * 18.0];
+        vel[1] += len * 0.5;
+        let id = server.next_arrow_id.fetch_add(1, Ordering::Relaxed);
+        server.arrows.lock().unwrap().insert(id, Arrow::new(id, from, vel));
+        events.push(ServerMsg::ArrowSpawn {
+            id,
+            x: from[0], y: from[1], z: from[2],
+            vx: vel[0], vy: vel[1], vz: vel[2],
+        });
+    }
+
+    for e in &events {
+        server.broadcast(e, None);
+    }
+    for (pid, dmg, cause) in hits {
+        damage_player(server, pid, dmg, cause);
+    }
+}
+
+/// One 10 Hz arrow tick: ballistics, wall hits, player hits.
+fn tick_arrows(server: &Server) {
+    const DT: f32 = 0.1;
+    let players: Vec<(u32, [f32; 3])> = server
+        .clients
+        .lock()
+        .unwrap()
+        .iter()
+        .map(|(&id, c)| (id, c.pos))
+        .collect();
+
+    let mut events: Vec<ServerMsg> = Vec::new();
+    let mut hits: Vec<u32> = Vec::new();
+    {
+        let mut world = server.world.lock().unwrap();
+        let mut arrow_map = server.arrows.lock().unwrap();
+        let mut moving = Vec::new();
+        arrow_map.retain(|id, a| match a.tick(&mut world, &players, DT) {
+            arrows::Fate::Flying => {
+                moving.push((a.id, a.pos[0], a.pos[1], a.pos[2]));
+                true
+            }
+            arrows::Fate::HitPlayer(pid) => {
+                hits.push(pid);
+                events.push(ServerMsg::ArrowGone { id: *id });
+                false
+            }
+            arrows::Fate::Gone => {
+                events.push(ServerMsg::ArrowGone { id: *id });
+                false
+            }
+        });
+        if !moving.is_empty() {
+            events.push(ServerMsg::Arrows { list: moving });
+        }
+    }
+
     for e in &events {
         server.broadcast(e, None);
     }
     for pid in hits {
-        damage_player(server, pid, mobs::ZOMBIE_DAMAGE, "zombie");
+        damage_player(server, pid, 4, "skeleton");
     }
 }
 
@@ -314,6 +427,8 @@ fn damage_player(server: &Server, id: u32, dmg: i32, cause: &str) {
         );
         let phrase = match cause {
             "zombie" => "was slain by a zombie",
+            "spider" => "was slain by a spider",
+            "skeleton" => "was shot by a skeleton",
             "fall" => "fell from a high place",
             _ => "died",
         };

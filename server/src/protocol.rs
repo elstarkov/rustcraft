@@ -78,6 +78,22 @@ pub enum ServerMsg {
     MobGone {
         id: u32,
     },
+    ArrowSpawn {
+        id: u32,
+        x: f32,
+        y: f32,
+        z: f32,
+        vx: f32,
+        vy: f32,
+        vz: f32,
+    },
+    /// Position batch for arrows in flight, sent every tick.
+    Arrows {
+        list: Vec<(u32, f32, f32, f32)>, // id, x, y, z
+    },
+    ArrowGone {
+        id: u32,
+    },
     DropSpawn {
         id: u32,
         item: u8,

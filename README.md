@@ -97,7 +97,8 @@ disk at all.
 
 **Protocol** — JSON text frames for control messages (`hello`, `chunk_req`,
 `set_block`, `pos`, `craft`, `chat` → `welcome`, `block_update`, `player_join/pos/leave`,
-`time`, `drop_spawn/drops/drop_gone`, `inventory`) and binary frames for chunk payloads:
+`time`, `drop_spawn/drops/drop_gone`, `arrow_spawn/arrows/arrow_gone`,
+`inventory`) and binary frames for chunk payloads:
 `[kind u8][cx i32][cz i32][16384 block bytes]`.
 
 **Day/night** — one in-game day lasts ten minutes. The server owns the clock
