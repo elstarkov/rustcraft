@@ -62,6 +62,14 @@ export class Net {
     this.send({ type: 'chat', text });
   }
 
+  eat() {
+    this.send({ type: 'eat' });
+  }
+
+  drown() {
+    this.send({ type: 'drown' });
+  }
+
   sendPos(pos, yaw, pitch) {
     this.send({ type: 'pos', x: pos.x, y: pos.y, z: pos.z, yaw, pitch });
   }

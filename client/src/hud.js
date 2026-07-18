@@ -1,6 +1,6 @@
-import { BLOCKS, PLACEABLE, TORCH } from './blocks.js';
+import { APPLE, BLOCKS, PLACEABLE, TORCH } from './blocks.js';
 import { ATLAS_TILES, TILE } from './textures.js';
-import { TOOLS, drawToolIcon, drawTorchIcon } from './items.js';
+import { TOOLS, drawAppleIcon, drawToolIcon, drawTorchIcon } from './items.js';
 
 export class HUD {
   constructor(atlasCanvas) {
@@ -9,12 +9,18 @@ export class HUD {
     this.debugEl = document.getElementById('debug');
     this.hotbarEl = document.getElementById('hotbar');
     this.heartsEl = document.getElementById('hearts');
+    this.foodEl = document.getElementById('food');
+    this.bubblesEl = document.getElementById('bubbles');
     this.slots = [];
     this.setHealth(20);
+    this.setFood(20);
+    this.setAir(10);
 
-    // Blocks first (keys 1-8), then tools; the wheel cycles everything.
+    // Blocks first (keys 1-8), then the apple, then tools; the wheel
+    // cycles everything.
     this.items = [
       ...PLACEABLE.map((id) => ({ block: id, name: BLOCKS[id].name })),
+      { block: APPLE, name: 'apple (right click to eat)' },
       ...TOOLS.map((tool) => ({ tool, name: tool.kind })),
     ];
 
@@ -28,8 +34,8 @@ export class HUD {
       thumb.width = TILE;
       thumb.height = TILE;
       const ctx = thumb.getContext('2d');
-      if (item.block === TORCH) {
-        drawTorchIcon(ctx);
+      if (item.block === TORCH || item.block === APPLE) {
+        (item.block === TORCH ? drawTorchIcon : drawAppleIcon)(ctx);
         item.countEl = document.createElement('span');
         item.countEl.className = 'count';
         slot.appendChild(item.countEl);
@@ -98,6 +104,7 @@ export class HUD {
     this.hotbarEl.classList.remove('hidden');
     this.debugEl.classList.remove('hidden');
     this.heartsEl.classList.remove('hidden');
+    this.foodEl.classList.remove('hidden');
   }
 
   /// 20 hp = ten hearts.
@@ -105,6 +112,21 @@ export class HUD {
     const full = Math.min(10, Math.max(0, Math.ceil(hp / 2)));
     this.heartsEl.innerHTML =
       '♥'.repeat(full) + `<span class="lost">${'♥'.repeat(10 - full)}</span>`;
+  }
+
+  /// 20 food = ten drumsticks.
+  setFood(food) {
+    const full = Math.min(10, Math.max(0, Math.ceil(food / 2)));
+    this.foodEl.innerHTML =
+      '🍗'.repeat(full) + `<span class="lost">${'🍗'.repeat(10 - full)}</span>`;
+  }
+
+  /// Ten bubbles of air; the row only shows while it isn't full.
+  setAir(air) {
+    const full = Math.min(10, Math.max(0, Math.ceil(air)));
+    this.bubblesEl.classList.toggle('hidden', full >= 10);
+    this.bubblesEl.innerHTML =
+      '●'.repeat(full) + `<span class="lost">${'●'.repeat(10 - full)}</span>`;
   }
 
   setDebug(text) {

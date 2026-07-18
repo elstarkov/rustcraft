@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { AIR, CHUNK_SIZE, WATER } from './blocks.js';
+import { AIR, APPLE, CHUNK_SIZE, WATER } from './blocks.js';
 import { buildAtlas } from './textures.js';
 import { World, chunkKey } from './world.js';
 import { buildGeometry, makeMaterials } from './mesher.js';
@@ -105,12 +105,17 @@ const deathEl = document.getElementById('death');
 const deathCauseEl = document.getElementById('death-cause');
 let deathShownAt = 0;
 let hp = 20;
+let food = 20;
+let eatCooldown = 0;
+let airLevel = 10; // ten bubbles ≈ fifteen seconds under water
+let drownAcc = 0;
 
 const DEATH_PHRASES = {
   zombie: 'slain by a zombie',
   spider: 'slain by a spider',
   skeleton: 'shot by a skeleton',
   fall: 'you fell from a high place',
+  drown: 'you drowned',
 };
 
 // Landings: always a thump, and past three blocks the server takes hearts.
@@ -297,6 +302,10 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
         hp = m.hp;
         hud.setHealth(hp);
         break;
+      case 'food':
+        food = m.food;
+        hud.setFood(food);
+        break;
       case 'respawn':
         player.pos.set(m.spawn[0], m.spawn[1], m.spawn[2]);
         player.vel.set(0, 0, 0);
@@ -448,6 +457,17 @@ document.addEventListener('mousedown', (e) => {
   if (e.button !== 2) return;
   const block = hud.selectedBlock;
   if (block == null) return; // a tool is in hand
+  if (block === APPLE) {
+    // Apples are eaten, not placed.
+    if (hud.stockOf(APPLE) > 0 && food < 20 && eatCooldown <= 0) {
+      eatCooldown = 0.8;
+      net.eat();
+      hud.consumeOne(APPLE);
+      viewModel.swing();
+      sound.munch();
+    }
+    return;
+  }
   if (hud.stockOf(block) <= 0) return; // nothing left to place
   const hit = player.raycast();
   if (!hit) return;
@@ -602,6 +622,23 @@ function frame() {
     viewModel.matchLight(hemi.intensity, sun.intensity);
     const horizSpeed = Math.hypot(player.vel.x, player.vel.z);
     viewModel.update(dt, horizSpeed, miningDown && hit !== null);
+
+    // Air: drains with your head under water, refills fast above it; empty
+    // lungs hurt every second until you surface.
+    eatCooldown = Math.max(0, eatCooldown - dt);
+    airLevel = player.inWater()
+      ? Math.max(0, airLevel - dt / 1.5)
+      : Math.min(10, airLevel + dt * 5);
+    hud.setAir(airLevel);
+    if (airLevel <= 0) {
+      drownAcc += dt;
+      if (drownAcc >= 1) {
+        drownAcc = 0;
+        net.drown();
+      }
+    } else {
+      drownAcc = 0.6; // first hit lands shortly after the last bubble pops
+    }
 
     // Footsteps paced by ground distance covered, zombie groans by chance
     // from wherever the nearest ones actually are.

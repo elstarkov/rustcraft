@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { TORCH } from './blocks.js';
-import { blockGeometry } from './blockgeo.js';
+import { APPLE, TORCH } from './blocks.js';
+import { blockGeometry, makeApple } from './blockgeo.js';
 import { makeTorch } from './torches.js';
 
 // Dropped items streamed from the server: small textured cubes that spin
@@ -29,6 +29,8 @@ export class RemoteDrops {
     if (item === TORCH) {
       mesh = makeTorch(); // a mini torch model, not a texture cube
       mesh.scale.setScalar(0.55);
+    } else if (item === APPLE) {
+      mesh = makeApple();
     } else {
       mesh = new THREE.Mesh(this.geometry(item), this.material);
     }

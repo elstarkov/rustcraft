@@ -17,6 +17,7 @@ export const COAL_ORE = 10;
 export const IRON_ORE = 11;
 export const GOLD_ORE = 12;
 export const TORCH = 13;
+export const APPLE = 14;
 
 // Atlas tile index per face: [top, bottom, side]
 export const BLOCKS = {
@@ -35,6 +36,8 @@ export const BLOCKS = {
   // Not a cube: the mesher skips torch cells entirely and the client
   // renders a little model instead (see torches.js). Tiles are unused.
   [TORCH]: { name: 'torch', tiles: [8, 8, 8], seeThrough: true },
+  // Food item — lives in inventories and drops, never in the world.
+  [APPLE]: { name: 'apple', tiles: [1, 1, 1], seeThrough: true },
 };
 
 // What the hotbar offers, in slot order. Ores are placeable so mined ore

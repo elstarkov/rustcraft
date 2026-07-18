@@ -92,6 +92,17 @@ export function drawToolIcon(ctx, kind) {
   ICONS[kind]?.(ctx);
 }
 
+/// Apple hotbar icon.
+export function drawAppleIcon(ctx) {
+  ctx.fillStyle = '#c62f2f';
+  ctx.fillRect(4, 5, 8, 8);
+  plot(ctx, [[3, 6], [3, 7], [3, 8], [3, 9], [12, 6], [12, 7], [12, 8], [12, 9], [5, 4], [10, 4]], '#c62f2f');
+  plot(ctx, [[5, 6], [5, 7], [6, 5]], '#e8837d'); // shine
+  plot(ctx, [[4, 11], [5, 12], [10, 12], [11, 11]], '#8f1f1f'); // shadow
+  plot(ctx, [[7, 3], [8, 3], [8, 2]], '#5a3d1e'); // stem
+  plot(ctx, [[9, 2], [10, 2], [10, 1]], '#3f7a2a'); // leaf
+}
+
 /// Torch hotbar icon: a stick with a glowing head. The torch has no atlas
 /// tile (the mesher never draws it), so its icon is pixel art like the tools.
 export function drawTorchIcon(ctx) {

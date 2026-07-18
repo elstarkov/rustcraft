@@ -108,6 +108,12 @@ export class Sound {
     this.tone('square', 240, 105, 0.18, 0.22);
   }
 
+  /// Biting an apple: crunch, then a little gulp.
+  munch() {
+    this.noise(0.07, 1100, 0.32);
+    this.tone('square', 160, 90, 0.07, 0.12, { delay: 0.13 });
+  }
+
   /// Landing thump; strength in fall blocks scales the boom.
   thump(strength = 1) {
     this.tone('sine', 105, 42, 0.16, Math.min(0.6, 0.2 + strength * 0.05));

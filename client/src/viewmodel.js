@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { TORCH } from './blocks.js';
-import { blockGeometry } from './blockgeo.js';
+import { APPLE, TORCH } from './blocks.js';
+import { blockGeometry, makeApple } from './blockgeo.js';
 import { drawToolIcon } from './items.js';
 import { makePalette } from './players.js';
 import { makeTorch } from './torches.js';
@@ -66,6 +66,9 @@ export class ViewModel {
       this.held = makeTorch();
       this.held.scale.setScalar(0.8);
       this.held.position.y = -0.18; // model origin is at its base
+    } else if (item?.block === APPLE) {
+      this.held = makeApple();
+      this.held.position.y = -0.12;
     } else if (item?.block != null) {
       if (!this.geometries.has(item.block)) {
         this.geometries.set(item.block, blockGeometry(item.block, 0.22));
