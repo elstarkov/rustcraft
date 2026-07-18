@@ -18,9 +18,11 @@ const VOLUME: usize = S * S * H;
 const BORDER: usize = S * H; // one neighbor column slice, indexed [y * S + i]
 const AIR: u8 = 0;
 const TORCH: u8 = 13;
+const TORCH_WALL_FIRST: u8 = 15;
+const TORCH_WALL_LAST: u8 = 18;
 
 /// [top, bottom, side] atlas tiles per block id — must match client blocks.js.
-const TILES: [[u32; 3]; 14] = [
+const TILES: [[u32; 3]; 19] = [
     [0, 0, 0],    // air (unused)
     [0, 1, 2],    // grass
     [1, 1, 1],    // dirt
@@ -35,15 +37,21 @@ const TILES: [[u32; 3]; 14] = [
     [12, 12, 12], // iron ore
     [13, 13, 13], // gold ore
     [8, 8, 8],    // torch (never emitted — see skip())
+    [1, 1, 1],    // apple (never in the world)
+    [8, 8, 8],    // wall torches (never emitted)
+    [8, 8, 8],
+    [8, 8, 8],
+    [8, 8, 8],
 ];
-const SEE_THROUGH: [bool; 14] = [
+const SEE_THROUGH: [bool; 19] = [
     true, false, false, false, false, false, false, false, true, true, false, false, false, true,
+    true, true, true, true, true,
 ];
 
 /// Torches aren't cubes: emit nothing for them (the client renders a model
 /// per torch) and let neighbors treat them like air.
 fn skip(b: u8) -> bool {
-    b == AIR || b == TORCH
+    b == AIR || b == TORCH || (TORCH_WALL_FIRST..=TORCH_WALL_LAST).contains(&b)
 }
 
 #[derive(Default)]

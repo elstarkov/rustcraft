@@ -1,5 +1,8 @@
 import * as THREE from 'three';
-import { CHUNK_SIZE, TORCH, WORLD_HEIGHT } from './blocks.js';
+import {
+  CHUNK_SIZE, TORCH, TORCH_WALL_NX, TORCH_WALL_NZ, TORCH_WALL_PX, TORCH_WALL_PZ, WORLD_HEIGHT,
+  isTorch,
+} from './blocks.js';
 
 // Torch rendering and light. Each torch cell gets a little model (stick +
 // glowing head); actual light comes from a fixed pool of point lights that
@@ -32,6 +35,17 @@ export function makeTorch() {
   return group;
 }
 
+// How each variant sits in its cell: floor torches stand centered, wall
+// torches shift toward their supporting wall, ride a little higher, and
+// lean away from it.
+const MOUNT = {
+  [TORCH]: { dx: 0, dz: 0, rx: 0, rz: 0, dy: 0 },
+  [TORCH_WALL_PX]: { dx: 0.3, dz: 0, rx: 0, rz: 0.5, dy: 0.22 },
+  [TORCH_WALL_NX]: { dx: -0.3, dz: 0, rx: 0, rz: -0.5, dy: 0.22 },
+  [TORCH_WALL_PZ]: { dx: 0, dz: 0.3, rx: -0.5, rz: 0, dy: 0.22 },
+  [TORCH_WALL_NZ]: { dx: 0, dz: -0.3, rx: 0.5, rz: 0, dy: 0.22 },
+};
+
 export class Torches {
   constructor(scene) {
     this.scene = scene;
@@ -54,11 +68,18 @@ export class Torches {
     for (let y = 0; y < WORLD_HEIGHT; y++) {
       for (let z = 0; z < CHUNK_SIZE; z++) {
         for (let x = 0; x < CHUNK_SIZE; x++) {
-          if (blocks[(y * CHUNK_SIZE + z) * CHUNK_SIZE + x] !== TORCH) continue;
+          const id = blocks[(y * CHUNK_SIZE + z) * CHUNK_SIZE + x];
+          if (!isTorch(id)) continue;
+          const m = MOUNT[id];
           const group = makeTorch();
-          group.position.set(cx * CHUNK_SIZE + x + 0.5, y, cz * CHUNK_SIZE + z + 0.5);
+          group.position.set(
+            cx * CHUNK_SIZE + x + 0.5 + m.dx,
+            y + m.dy,
+            cz * CHUNK_SIZE + z + 0.5 + m.dz,
+          );
+          group.rotation.set(m.rx, 0, m.rz);
           this.scene.add(group);
-          list.push({ x: group.position.x, y, z: group.position.z, group });
+          list.push({ x: group.position.x, y: group.position.y, z: group.position.z, group });
         }
       }
     }

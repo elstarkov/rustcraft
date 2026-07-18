@@ -8,12 +8,12 @@
 // vertex attribute picks the atlas tile (see makeMaterials in mesher.js).
 
 import {
-  AIR, BLOCKS, CHUNK_SIZE, TORCH, WORLD_HEIGHT, isSeeThrough,
+  AIR, BLOCKS, CHUNK_SIZE, WORLD_HEIGHT, isSeeThrough, isTorch,
 } from './blocks.js';
 
 // Torches aren't cubes: the mesher emits nothing for them (torches.js
 // renders a model per torch) and neighbors treat them like air.
-const skip = (b) => b === AIR || b === TORCH;
+const skip = (b) => b === AIR || isTorch(b);
 
 const SHADE = { nx: 0.8, px: 0.8, ny: 0.55, py: 1.0, nz: 0.7, pz: 0.7 };
 

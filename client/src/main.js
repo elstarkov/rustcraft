@@ -1,5 +1,8 @@
 import * as THREE from 'three';
-import { AIR, APPLE, CHUNK_SIZE, WATER } from './blocks.js';
+import {
+  AIR, APPLE, CHUNK_SIZE, TORCH, TORCH_WALL_NX, TORCH_WALL_NZ, TORCH_WALL_PX, TORCH_WALL_PZ,
+  WATER,
+} from './blocks.js';
 import { buildAtlas } from './textures.js';
 import { World, chunkKey } from './world.js';
 import { buildGeometry, makeMaterials } from './mesher.js';
@@ -474,8 +477,19 @@ document.addEventListener('mousedown', (e) => {
   const [px, py, pz] = [hit.x + hit.face[0], hit.y + hit.face[1], hit.z + hit.face[2]];
   const current = world.getBlock(px, py, pz);
   if ((current === AIR || current === WATER) && !player.blockIntersectsPlayer(px, py, pz)) {
-    applyEdit(px, py, pz, block);
-    net.setBlock(px, py, pz, block);
+    let placeId = block;
+    if (block === TORCH && hit.face[1] === 0) {
+      // Clicked a wall: mount the torch on it. The clicked block sits at
+      // cell minus face, so the supporting wall is the -face side.
+      placeId = {
+        '1,0': TORCH_WALL_NX,
+        '-1,0': TORCH_WALL_PX,
+        '0,1': TORCH_WALL_NZ,
+        '0,-1': TORCH_WALL_PZ,
+      }[`${hit.face[0]},${hit.face[2]}`] ?? TORCH;
+    }
+    applyEdit(px, py, pz, placeId);
+    net.setBlock(px, py, pz, placeId);
     hud.consumeOne(block);
     viewModel.swing();
     sound.place();
