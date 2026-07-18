@@ -59,6 +59,7 @@ Server environment variables, handy for testing:
 | `RUSTCRAFT_TIME=0.6` | start the world clock at a day fraction (0 sunrise, 0.25 noon, 0.5 sunset) |
 | `RUSTCRAFT_SPAWN=skeleton` | force every hostile spawn to one kind (zombie, skeleton, spider) |
 | `RUSTCRAFT_CREATIVE=1` | placing blocks needs no stock and consumes nothing |
+| `RUSTCRAFT_HUNGER=1` | seconds per food point (default 45) |
 
 ### Benchmarking
 
@@ -86,7 +87,7 @@ cache.
 | SPACE | jump / swim up |
 | hold left click | mine block (faster with the right tool) |
 | left click a zombie | attack — sword 6, tools 3, fists 2 |
-| right click | place block |
+| right click | place block (eat, with the apple in hand) |
 | 1–8 / wheel | select block or tool |
 | E | open / close crafting |
 | T / Enter | chat |
@@ -106,7 +107,7 @@ restarts — untouched terrain keeps regenerating from the seed and costs no
 disk at all.
 
 **Protocol** — JSON text frames for control messages (`hello`, `chunk_req`,
-`set_block`, `pos`, `craft`, `chat` → `welcome`, `block_update`, `player_join/pos/leave`,
+`set_block`, `pos`, `craft`, `chat`, `eat`, `drown` → `welcome`, `block_update`, `player_join/pos/leave`,
 `time`, `drop_spawn/drops/drop_gone`, `arrow_spawn/arrows/arrow_gone`,
 `inventory`) and binary frames for chunk payloads:
 `[kind u8][cx i32][cz i32][16384 block bytes]`.
@@ -181,6 +182,14 @@ world spawn with full hearts. Swinging back deals 6 with the sword, 3 with other
 tools, 2 bare-handed, with knockback — a zombie dies after 12, skeletons
 after 10, spiders and sheep after 8.
 
+**Hunger & air** — the food bar (drumsticks, right of your hearts) drains a
+point every 45 seconds. At zero, starvation grinds you down to one heart but
+never kills; at sixteen points or more you slowly regenerate — food is the
+only way to heal short of dying. The only food is the apple: leaves drop one
+15% of the time, and a right click eats it for six points. Under water, ten
+bubbles buy about fifteen seconds of air; when they run out you take
+drowning damage every second until you surface, and they refill in two.
+
 **Sound** — every effect is synthesized by the Web Audio API the moment it
 plays: digs and footsteps are filtered noise bursts, pickups are sine chirps,
 crafting is a wooden double-knock, hurt is a falling square wave, and zombie
@@ -222,3 +231,5 @@ which makes lakes the fast way down a mountain.
 - [x] Death screen naming the cause
 - [x] Torches — craftable light that keeps monsters from spawning nearby
 - [x] More mob types — skeletons with arrows, spiders, sheep
+- [x] Hunger — apples from leaves, starvation, food-driven regen
+- [x] Drowning, with an air meter
