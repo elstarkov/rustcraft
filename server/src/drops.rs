@@ -18,8 +18,12 @@ pub struct Drop {
 }
 
 /// What breaking a block leaves behind. Everything drops itself so every
-/// hotbar slot stays obtainable; air and water leave nothing.
-pub fn drop_for(id: u8) -> Option<u8> {
+/// hotbar slot stays obtainable; air and water leave nothing — and leaves
+/// sometimes hide an apple, the only food in the game.
+pub fn drop_for(id: u8, roll: f32) -> Option<u8> {
+    if id == block::LEAVES && roll < 0.15 {
+        return Some(block::APPLE);
+    }
     (id != block::AIR && id != block::WATER).then_some(id)
 }
 

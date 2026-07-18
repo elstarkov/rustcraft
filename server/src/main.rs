@@ -23,12 +23,18 @@ use world::{block, World};
 type Error = Box<dyn std::error::Error + Send + Sync>;
 
 const FULL_HP: i32 = 20;
+const FULL_FOOD: i32 = 20;
 
 struct Client {
     tx: UnboundedSender<Message>,
     name: String,
     pos: [f32; 3],
     hp: i32,
+    food: i32,
+    // Hunger clock accumulators, all in seconds.
+    food_t: f32,
+    starve_t: f32,
+    regen_t: f32,
     inventory: HashMap<u8, u32>,
 }
 
@@ -62,6 +68,8 @@ struct Server {
     forced_spawn: Option<mobs::Kind>,
     /// RUSTCRAFT_CREATIVE=1: placing needs no stock and consumes nothing.
     creative: bool,
+    /// Seconds per food point (RUSTCRAFT_HUNGER shortens it for tests).
+    hunger_secs: f32,
 }
 
 impl Server {
@@ -119,6 +127,10 @@ async fn main() {
         start_frac,
         forced_spawn,
         creative: std::env::var("RUSTCRAFT_CREATIVE").is_ok_and(|v| v == "1"),
+        hunger_secs: std::env::var("RUSTCRAFT_HUNGER")
+            .ok()
+            .and_then(|v| v.parse().ok())
+            .unwrap_or(45.0),
     });
 
     // Mob AI runs at 10 Hz.
@@ -131,6 +143,7 @@ async fn main() {
             tick_mobs(&mob_server, &mut rng);
             tick_arrows(&mob_server);
             tick_drops(&mob_server);
+            tick_hunger(&mob_server);
         }
     });
 
@@ -296,6 +309,55 @@ fn tick_mobs(server: &Server, rng: &mut mobs::Rng) {
     }
 }
 
+/// Hunger clock at 10 Hz: food drains over time, an empty stomach grinds
+/// you down to two hearts (never kills), a well-fed one slowly heals.
+fn tick_hunger(server: &Server) {
+    const DT: f32 = 0.1;
+    let send = |c: &Client, msg: &ServerMsg| {
+        let _ = c.tx.send(Message::text(serde_json::to_string(msg).unwrap()));
+    };
+    let mut starving: Vec<u32> = Vec::new();
+    {
+        let mut clients = server.clients.lock().unwrap();
+        for (&id, c) in clients.iter_mut() {
+            c.food_t += DT;
+            if c.food_t >= server.hunger_secs {
+                c.food_t = 0.0;
+                if c.food > 0 {
+                    c.food -= 1;
+                    send(c, &ServerMsg::Food { food: c.food });
+                }
+            }
+
+            if c.food == 0 {
+                c.starve_t += DT;
+                if c.starve_t >= 4.0 {
+                    c.starve_t = 0.0;
+                    if c.hp > 2 {
+                        starving.push(id);
+                    }
+                }
+            } else {
+                c.starve_t = 0.0;
+            }
+
+            if c.food >= 16 && c.hp < FULL_HP {
+                c.regen_t += DT;
+                if c.regen_t >= 3.0 {
+                    c.regen_t = 0.0;
+                    c.hp += 1;
+                    send(c, &ServerMsg::Health { hp: c.hp });
+                }
+            } else {
+                c.regen_t = 0.0;
+            }
+        }
+    }
+    for id in starving {
+        damage_player(server, id, 1, "starve");
+    }
+}
+
 /// One 10 Hz arrow tick: ballistics, wall hits, player hits.
 fn tick_arrows(server: &Server) {
     const DT: f32 = 0.1;
@@ -421,12 +483,14 @@ fn damage_player(server: &Server, id: u32, dmg: i32, cause: &str) {
         let died = c.hp <= 0;
         if died {
             c.hp = FULL_HP;
+            c.food = FULL_FOOD;
             c.pos = spawn;
         }
         (c.hp, died, c.name.clone())
     };
     if died {
         server.send_to(id, &ServerMsg::Respawn { spawn, cause: cause.into() });
+        server.send_to(id, &ServerMsg::Food { food: FULL_FOOD });
         // Everyone else sees the body snap back to spawn.
         server.broadcast(
             &ServerMsg::PlayerPos { id, x: spawn[0], y: spawn[1], z: spawn[2], yaw: 0.0, pitch: 0.0 },
@@ -437,6 +501,7 @@ fn damage_player(server: &Server, id: u32, dmg: i32, cause: &str) {
             "spider" => "was slain by a spider",
             "skeleton" => "was shot by a skeleton",
             "fall" => "fell from a high place",
+            "drown" => "drowned",
             _ => "died",
         };
         server.broadcast(
@@ -499,6 +564,10 @@ async fn handle_client(server: Arc<Server>, stream: TcpStream) -> Result<(), Err
             name: name.clone(),
             pos: spawn,
             hp: FULL_HP,
+            food: FULL_FOOD,
+            food_t: 0.0,
+            starve_t: 0.0,
+            regen_t: 0.0,
             inventory: HashMap::new(),
         },
     );
@@ -506,6 +575,7 @@ async fn handle_client(server: Arc<Server>, stream: TcpStream) -> Result<(), Err
     server.send_to(id, &ServerMsg::Welcome { id, spawn, players });
     server.send_to(id, &ServerMsg::Time { t: server.world_time() });
     server.send_to(id, &ServerMsg::Health { hp: FULL_HP });
+    server.send_to(id, &ServerMsg::Food { food: FULL_FOOD });
     let inv_msg = server.clients.lock().unwrap().get(&id).map(inventory_snapshot);
     if let Some(m) = inv_msg {
         server.send_to(id, &m);
@@ -603,9 +673,9 @@ fn handle_msg(server: &Server, id: u32, msg: ClientMsg) {
 
             if bid == block::AIR {
                 // Breaking pops the block out as an item drop.
-                if let Some(item) = drops::drop_for(prev) {
-                    let did = server.next_drop_id.fetch_add(1, Ordering::Relaxed);
-                    let mut rng = mobs::Rng(did.wrapping_mul(0x9e37_79b9) ^ 0x517c_c1b7);
+                let did = server.next_drop_id.fetch_add(1, Ordering::Relaxed);
+                let mut rng = mobs::Rng(did.wrapping_mul(0x9e37_79b9) ^ 0x517c_c1b7);
+                if let Some(item) = drops::drop_for(prev, rng.unit()) {
                     let d = Drop::new(did, item, x, y, z, rng.unit(), rng.unit());
                     let msg = ServerMsg::DropSpawn { id: did, item, x: d.pos[0], y: d.pos[1], z: d.pos[2] };
                     server.drops.lock().unwrap().insert(did, d);
@@ -689,6 +759,24 @@ fn handle_msg(server: &Server, id: u32, msg: ClientMsg) {
             if dmg > 0 {
                 damage_player(server, id, dmg, "fall");
             }
+        }
+        ClientMsg::Eat => {
+            let msgs = {
+                let mut clients = server.clients.lock().unwrap();
+                let Some(c) = clients.get_mut(&id) else { return };
+                let apples = c.inventory.get(&block::APPLE).copied().unwrap_or(0);
+                if apples == 0 || c.food >= FULL_FOOD {
+                    return;
+                }
+                c.inventory.insert(block::APPLE, apples - 1);
+                c.food = (c.food + 6).min(FULL_FOOD);
+                (inventory_snapshot(c), ServerMsg::Food { food: c.food })
+            };
+            server.send_to(id, &msgs.0);
+            server.send_to(id, &msgs.1);
+        }
+        ClientMsg::Drown => {
+            damage_player(server, id, 2, "drown");
         }
         ClientMsg::Chat { text } => {
             let text: String = text.trim().chars().take(200).collect();

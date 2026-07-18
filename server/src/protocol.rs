@@ -16,6 +16,11 @@ pub enum ClientMsg {
     /// the server just converts height to damage (clamped).
     Fall { blocks: f32 },
     Chat { text: String },
+    /// Eat one apple (server checks stock and appetite).
+    Eat,
+    /// The client's head has been underwater past its air — hurts every
+    /// second it keeps being sent.
+    Drown,
 }
 
 #[derive(Serialize, Clone)]
@@ -121,6 +126,10 @@ pub enum ServerMsg {
     },
     Health {
         hp: i32,
+    },
+    /// Hunger: 20 = full, 0 = starving.
+    Food {
+        food: i32,
     },
     Respawn {
         spawn: [f32; 3],

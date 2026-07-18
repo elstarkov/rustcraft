@@ -25,6 +25,8 @@ pub mod block {
     pub const GOLD_ORE: u8 = 12;
     /// Non-solid light source; crafted, never generated.
     pub const TORCH: u8 = 13;
+    /// Food item: exists only in inventories and drops, never in the world.
+    pub const APPLE: u8 = 14;
 
     /// Blocks a client is allowed to place. Water flows only from world gen.
     /// Ores are placeable so mined ore isn't a dead item (no crafting yet).
