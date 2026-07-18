@@ -153,17 +153,22 @@ menu). Torches are non-solid little lights you can plant anywhere, which
 finally gives coal a purpose. The sword mines nothing faster —
 it's for fighting. Tools are free and indestructible for now.
 
-**Monsters** — zombies spawn on the surface near players at night (the server
-clock decides) and despawn at dawn, when everyone leaves, or after idling too
-long — usually that means one fell into a cave mid-chase. AI runs server-side
-at 10 Hz with the same AABB voxel physics as players: they wander, chase
-anyone within 3D range, hop single blocks (the jump speed is tuned for the
-coarse tick), float across ponds, and swing for 3 damage in melee range.
+**Monsters & animals** — hostile mobs spawn on the surface near players at
+night (the server clock decides, weighted zombie/skeleton/spider) and vanish
+at dawn, when everyone leaves, or after idling too long — usually that means
+one fell into a cave mid-chase. Zombies chase and swing for 3; skeletons
+hold a 6–16 block band and, with line of sight, loose ballistic arrows that
+hit for 4; spiders sprint low and pounce from mid range for 2. Sheep graze
+near players at any hour and bolt when hit. AI runs server-side at 10 Hz
+with the same AABB voxel physics as players: they wander, chase anyone
+within 3D range, hop single blocks (the jump speed is tuned for the coarse
+tick), and float across ponds.
 Players carry 20 hp rendered as hearts and flash red when hit. Death shows a
 proper death screen naming the cause ("slain by a zombie", "you fell from a
 high place"), announces it in chat for everyone, and a click respawns you at
 world spawn with full hearts. Swinging back deals 6 with the sword, 3 with other
-tools, 2 bare-handed, with knockback — a zombie dies after 12.
+tools, 2 bare-handed, with knockback — a zombie dies after 12, skeletons
+after 10, spiders and sheep after 8.
 
 **Sound** — every effect is synthesized by the Web Audio API the moment it
 plays: digs and footsteps are filtered noise bursts, pickups are sine chirps,
@@ -205,4 +210,4 @@ which makes lakes the fast way down a mountain.
 - [x] Chat with join, leave and death announcements
 - [x] Death screen naming the cause
 - [x] Torches — craftable light for the night
-- [ ] More mob types
+- [x] More mob types — skeletons with arrows, spiders, sheep

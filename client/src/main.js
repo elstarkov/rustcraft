@@ -11,6 +11,7 @@ import { Net } from './net.js';
 import { RemotePlayers } from './players.js';
 import { RemoteMobs } from './mobs.js';
 import { RemoteDrops } from './drops.js';
+import { RemoteArrows } from './arrows.js';
 import { ViewModel } from './viewmodel.js';
 import { CraftingPanel } from './craft.js';
 import { Sound } from './sound.js';
@@ -86,6 +87,7 @@ const player = new Player(world, camera);
 const remotePlayers = new RemotePlayers(scene);
 const remoteMobs = new RemoteMobs(scene);
 const remoteDrops = new RemoteDrops(scene, atlas);
+const remoteArrows = new RemoteArrows(scene);
 const torches = new Torches(scene);
 const viewModel = new ViewModel(atlas);
 const craftPanel = new CraftingPanel(atlasCanvas, (i) => {
@@ -268,6 +270,15 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
       }
       case 'mob_gone':
         remoteMobs.remove(m.id);
+        break;
+      case 'arrow_spawn':
+        remoteArrows.add(m.id, [m.x, m.y, m.z], [m.vx, m.vy, m.vz]);
+        break;
+      case 'arrows':
+        remoteArrows.updateAll(m.list);
+        break;
+      case 'arrow_gone':
+        remoteArrows.remove(m.id);
         break;
       case 'drop_spawn':
         remoteDrops.add(m.id, m.item, [m.x, m.y, m.z]);
@@ -621,6 +632,7 @@ function frame() {
   remotePlayers.update(dt);
   remoteMobs.update(dt);
   remoteDrops.update(dt);
+  remoteArrows.update(dt);
   torches.update(dt, player.pos);
   chunkMeshes.process(4);
 
@@ -654,7 +666,7 @@ frame();
 // Debug handle for tooling and console poking.
 window.__rustcraft = {
   world, player, chunkMeshes, remotePlayers, remoteMobs, remoteDrops, hud, scene, viewModel,
-  craftPanel, sound, chat, net, torches, applyEdit,
+  craftPanel, sound, chat, net, torches, remoteArrows, applyEdit,
   crack: { box: crackBox, textures: crackTextures },
   get hp() { return hp; },
 };
