@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 
 use futures_util::{SinkExt, StreamExt};
+use serde::{Deserialize, Serialize};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 use tokio_tungstenite::tungstenite::Message;
@@ -24,6 +25,16 @@ type Error = Box<dyn std::error::Error + Send + Sync>;
 
 const FULL_HP: i32 = 20;
 const FULL_FOOD: i32 = 20;
+
+/// Everything about a player worth keeping across reconnects and restarts.
+/// One JSON file per player name, next to the chunk files.
+#[derive(Serialize, Deserialize)]
+struct PlayerSave {
+    pos: [f32; 3],
+    hp: i32,
+    food: i32,
+    inventory: Vec<(u8, u32)>,
+}
 
 struct Client {
     tx: UnboundedSender<Message>,
@@ -70,6 +81,36 @@ struct Server {
     creative: bool,
     /// Seconds per food point (RUSTCRAFT_HUNGER shortens it for tests).
     hunger_secs: f32,
+    players_dir: std::path::PathBuf,
+}
+
+impl Server {
+    /// Filesystem-safe path for a player's save: readable name plus a hash
+    /// of the real one, so odd names can't collide after sanitizing.
+    fn player_path(&self, name: &str) -> std::path::PathBuf {
+        let safe: String = name
+            .chars()
+            .map(|c| if c.is_ascii_alphanumeric() || c == '-' || c == '_' { c } else { '_' })
+            .collect();
+        let mut hash: u32 = 0x811c_9dc5;
+        for b in name.bytes() {
+            hash ^= b as u32;
+            hash = hash.wrapping_mul(0x0100_0193);
+        }
+        self.players_dir.join(format!("{safe}_{hash:08x}.json"))
+    }
+
+    fn save_player(&self, name: &str, save: &PlayerSave) {
+        let path = self.player_path(name);
+        if let Err(e) = std::fs::write(&path, serde_json::to_vec(save).unwrap()) {
+            eprintln!("failed to save player {name}: {e}");
+        }
+    }
+
+    fn load_player(&self, name: &str) -> Option<PlayerSave> {
+        let bytes = std::fs::read(self.player_path(name)).ok()?;
+        serde_json::from_slice(&bytes).ok()
+    }
 }
 
 impl Server {
@@ -131,6 +172,34 @@ async fn main() {
             .ok()
             .and_then(|v| v.parse().ok())
             .unwrap_or(45.0),
+        players_dir: std::path::PathBuf::from("world/players"),
+    });
+    std::fs::create_dir_all(&server.players_dir).expect("failed to create players dir");
+
+    // Autosave every connected player so a crash costs at most ten seconds.
+    let save_server = server.clone();
+    tokio::spawn(async move {
+        let mut tick = tokio::time::interval(std::time::Duration::from_secs(10));
+        loop {
+            tick.tick().await;
+            let snapshots: Vec<(String, PlayerSave)> = save_server
+                .clients
+                .lock()
+                .unwrap()
+                .values()
+                .map(|c| {
+                    (c.name.clone(), PlayerSave {
+                        pos: c.pos,
+                        hp: c.hp,
+                        food: c.food,
+                        inventory: c.inventory.iter().map(|(&k, &v)| (k, v)).collect(),
+                    })
+                })
+                .collect();
+            for (name, save) in snapshots {
+                save_server.save_player(&name, &save);
+            }
+        }
     });
 
     // Mob AI runs at 10 Hz.
@@ -543,7 +612,32 @@ async fn handle_client(server: Arc<Server>, stream: TcpStream) -> Result<(), Err
     };
 
     let id = server.next_id.fetch_add(1, Ordering::Relaxed);
-    let spawn = server.world.lock().unwrap().spawn_point();
+
+    // Returning players pick up where they left off — unless their saved
+    // spot has been built over, in which case world spawn is safer.
+    let saved = server.load_player(&name);
+    let (spawn, hp, food, inventory) = {
+        let mut world = server.world.lock().unwrap();
+        let world_spawn = world.spawn_point();
+        match saved {
+            Some(s) => {
+                let solid = |id: u8| {
+                    id != block::AIR && id != block::WATER && !block::is_torch(id)
+                };
+                let (bx, bz) = (s.pos[0].floor() as i32, s.pos[2].floor() as i32);
+                let feet = world.block_at(bx, s.pos[1].floor() as i32, bz);
+                let head = world.block_at(bx, (s.pos[1] + 1.5).floor() as i32, bz);
+                let pos = if solid(feet) || solid(head) { world_spawn } else { s.pos };
+                (
+                    pos,
+                    s.hp.clamp(1, FULL_HP),
+                    s.food.clamp(0, FULL_FOOD),
+                    s.inventory.into_iter().collect::<HashMap<_, _>>(),
+                )
+            }
+            None => (world_spawn, FULL_HP, FULL_FOOD, HashMap::new()),
+        }
+    };
 
     let players: Vec<PlayerInfo> = server
         .clients
@@ -563,19 +657,19 @@ async fn handle_client(server: Arc<Server>, stream: TcpStream) -> Result<(), Err
             tx: tx.clone(),
             name: name.clone(),
             pos: spawn,
-            hp: FULL_HP,
-            food: FULL_FOOD,
+            hp,
+            food,
             food_t: 0.0,
             starve_t: 0.0,
             regen_t: 0.0,
-            inventory: HashMap::new(),
+            inventory,
         },
     );
 
     server.send_to(id, &ServerMsg::Welcome { id, spawn, players });
     server.send_to(id, &ServerMsg::Time { t: server.world_time() });
-    server.send_to(id, &ServerMsg::Health { hp: FULL_HP });
-    server.send_to(id, &ServerMsg::Food { food: FULL_FOOD });
+    server.send_to(id, &ServerMsg::Health { hp });
+    server.send_to(id, &ServerMsg::Food { food });
     let inv_msg = server.clients.lock().unwrap().get(&id).map(inventory_snapshot);
     if let Some(m) = inv_msg {
         server.send_to(id, &m);
@@ -617,7 +711,15 @@ async fn handle_client(server: Arc<Server>, stream: TcpStream) -> Result<(), Err
         }
     }
 
-    server.clients.lock().unwrap().remove(&id);
+    let removed = server.clients.lock().unwrap().remove(&id);
+    if let Some(c) = removed {
+        server.save_player(&c.name, &PlayerSave {
+            pos: c.pos,
+            hp: c.hp,
+            food: c.food,
+            inventory: c.inventory.iter().map(|(&k, &v)| (k, v)).collect(),
+        });
+    }
     server.broadcast(&ServerMsg::PlayerLeave { id }, None);
     println!("[-] {name} (#{id}) left");
     Ok(())
