@@ -108,6 +108,7 @@ const deathEl = document.getElementById('death');
 const deathCauseEl = document.getElementById('death-cause');
 let deathShownAt = 0;
 let hp = 20;
+let hpKnown = false; // a restored (lower) hp on join isn't damage
 let food = 20;
 let eatCooldown = 0;
 let airLevel = 10; // ten bubbles ≈ fifteen seconds under water
@@ -298,10 +299,11 @@ const net = new Net(`ws://${location.hostname}:8765`, playerName(), {
         remoteDrops.remove(m.id);
         break;
       case 'health':
-        if (m.hp < hp) {
+        if (hpKnown && m.hp < hp) {
           damageFlash();
           sound.hurt();
         }
+        hpKnown = true;
         hp = m.hp;
         hud.setHealth(hp);
         break;
