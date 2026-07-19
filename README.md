@@ -206,6 +206,12 @@ paced by how fast the avatar actually moves between network updates, the head
 follows the sender's pitch, and yaw turns the short way around the circle.
 A chat box sits bottom-left — T or Enter to type, message lines fade after a
 few seconds (typing reveals the history), and joins and leaves are announced.
+Players persist like the world does: inventory, health, hunger and position
+are saved per name next to the chunk files, written on disconnect and
+autosaved every ten seconds — so reconnecting (even after a server crash)
+puts you back where you were with everything you had. If your saved spot has
+been built over since, you come back at world spawn instead of inside a
+wall.
 
 **Physics** — the player is a 0.6×1.8 AABB integrated per axis against the
 voxel grid (gravity, jumping, swimming). Block targeting uses an
@@ -237,3 +243,4 @@ which makes lakes the fast way down a mountain.
 - [x] Hunger — apples from leaves, starvation, food-driven regen
 - [x] Drowning, with an air meter
 - [x] Wall-mounted torches
+- [x] Persistent players — reconnect with your inventory, health and position
